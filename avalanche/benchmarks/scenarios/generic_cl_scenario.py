@@ -17,8 +17,13 @@ TGenericExperience = TypeVar('TGenericExperience', bound='GenericExperience')
 TGenericScenarioStream = TypeVar('TGenericScenarioStream',
                                  bound='GenericScenarioStream')
 
+####
+# gym as core-dependency..?
+from gym import Env
+RLStreamDataOrigin = Union[Env, Sequence[Env]]
 TStreamDataOrigin = Union[AvalancheDataset, Sequence[AvalancheDataset],
-                          Tuple[Iterator[AvalancheDataset], int]]
+                          Tuple[Iterator[AvalancheDataset], int], RLStreamDataOrigin]
+
 TStreamTaskLabels = Optional[Sequence[Union[int, Set[int]]]]
 TOriginDataset = Optional[Dataset]
 
@@ -74,6 +79,7 @@ class GenericCLScenario(Generic[TExperience]):
     The name of custom streams can only contain letters, numbers or the "_"
     character and must not start with a number.
     """
+
     def __init__(self: TGenericCLScenario,
                  *,
                  stream_definitions: TStreamsUserDict,
@@ -348,7 +354,6 @@ class GenericCLScenario(Generic[TExperience]):
 
         if len(stream_def) > 2:
             origin_dataset = stream_def[2]
-
         if isinstance(exp_data, Dataset):
             # Single element
             exp_data = [exp_data]
@@ -364,6 +369,9 @@ class GenericCLScenario(Generic[TExperience]):
                 exp_data_lst.append(exp)
                 exp_idx += 1
             exp_data = exp_data_lst
+        elif isinstance(exp_data, Env) or (len(exp_data) and isinstance(exp_data[0], Env)):
+            # TODO: do something
+            return StreamDef(exp_data, None, None)
         else:
             # Standard def
             exp_data = list(exp_data)

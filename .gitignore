@@ -9,3 +9,4 @@ logs/
 *.pyc
 doc_html/*
 .coverage
+*.egg-info/
