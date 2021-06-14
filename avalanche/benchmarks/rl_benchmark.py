@@ -2,6 +2,7 @@ from avalanche.benchmarks.scenarios.generic_definitions import Experience
 from avalanche.benchmarks.scenarios.generic_cl_scenario import TGenericScenarioStream, GenericScenarioStream, TGenericCLScenario, Iterable, GenericCLScenario, GenericExperience
 from gym.core import Env
 from typing import Dict, Union, Optional, Sequence, Any, List
+import random
 
 
 def rl_experience_factory(
@@ -17,14 +18,26 @@ class RLScenario(GenericCLScenario['RLExperience']):
     def __init__(self, envs: List[Env],
                  n_experiences: int,
                  task_labels: bool=True,
-                 per_experience_episodes: int = 1,  # uniform to per_experience_classes format
-                 #  shuffle: bool = True, shuffle task?
+                 shuffle: bool = False, 
                  seed: Optional[int] = None,
                  fixed_task_order: Optional[Sequence[int]] = None,
                  class_ids_from_zero_from_first_exp: bool = False,
                  class_ids_from_zero_in_each_exp: bool = False,
                  reproducibility_data: Optional[Dict[str, Any]] = None):
+
+        assert n_experiences > 0, "Number of experiences must be a positive integer"
         self.envs = envs
+        if n_experiences < len(self.envs):
+            self.envs = self.envs[:n_experiences]
+        elif n_experiences > len(self.envs):
+            # cycle through envs sequentially
+            for i in range(n_experiences - len(self.envs)):
+                self.envs.append(self.envs[i % len(self.envs)])
+
+        if shuffle:
+            perm = random.shuffle(list(range(len(self.envs))))
+            self.envs = [self.envs[i] for i in perm]
+        
         # ignore labels for now
         stream_definitions = {
             'train': (self.envs, None, None),
@@ -148,7 +161,7 @@ class RLExperience(GenericExperience[RLScenario,
     dataset and the associated task label. It also keeps a reference to the
     stream from which this experience was taken.
     """
-
+    
     def __init__(self,
                  origin_stream: GenericScenarioStream[
                      'RLExperience', RLScenario],
