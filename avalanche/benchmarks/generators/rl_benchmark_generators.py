@@ -14,7 +14,7 @@ def get_all_envs_id():
 def gym_benchmark_generator(
         env_names: List[str] = [],
         environments: List[gym.Env] = [],
-        n_envs: int = None, env_kwargs: Dict[Dict[Any]] = {},
+        n_envs: int = None, env_kwargs: Dict[str, Dict[Any, Any]] = {},
         n_experiences=None,
         envs_ids_to_sample_from: List[str] = None, *args, **kwargs) -> RLScenario:
     # three ways to create environments from gym

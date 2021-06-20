@@ -40,8 +40,8 @@ class RLScenario(GenericCLScenario['RLExperience']):
         
         # ignore labels for now
         stream_definitions = {
-            'train': (self.envs, None, None),
-            'test': (self.envs, None, None)
+            'train': (self.envs, 0, None),
+            'test': (self.envs, 0, None)
         }
         super().__init__(stream_definitions=stream_definitions,
                          complete_test_set_only=False,
@@ -161,7 +161,7 @@ class RLExperience(GenericExperience[RLScenario,
     dataset and the associated task label. It also keeps a reference to the
     stream from which this experience was taken.
     """
-    
+
     def __init__(self,
                  origin_stream: GenericScenarioStream[
                      'RLExperience', RLScenario],
@@ -181,6 +181,10 @@ class RLExperience(GenericExperience[RLScenario,
     def environment(self) -> Env:
         return self.env
 
+    # FIXME: can't be None
+    @property
+    def task_labels(self) -> List[int]:
+        return [0]
 
 if __name__ == "__main__":
     # create scenario
