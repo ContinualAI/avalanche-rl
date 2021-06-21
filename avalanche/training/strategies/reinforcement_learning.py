@@ -50,6 +50,19 @@ class Rollout:
         return rwds.T
 
     @property
+    def dones(self):
+        """
+            Returns terminal state flag of each step of this rollout.
+        """
+        # batch dimension over number of parallel environments, instatiate transpose for faster assignment
+        dones = torch.zeros(
+            (len(self.steps), self.n_envs),
+            dtype=torch.float32)
+        for i, step in enumerate(self.steps):
+            dones[i] = step.dones
+        return dones.bool().T
+
+    @property
     def actions(self):
         """
             Returns all actions taken at each step of this rollout.
@@ -190,6 +203,7 @@ class RLBaseStrategy:
             self.train_exp(self.experience, eval_streams, **kwargs)
         self.after_training(**kwargs)
 
+        self.is_training = False
         # res = self.evaluator.get_last_metrics()
         # return res
 
@@ -198,6 +212,7 @@ class RLBaseStrategy:
         self.steps = 0
         # either run N episodes or steps depending on specified parameter
         step_mode = self.per_experience_steps > 0
+        # TODO: keep only episode threshold, return done in rollouts?
         n = self.per_experience_steps if self.per_experience_steps > 0 else self.per_experience_episodes
 
         # Data Adaptation (e.g. add new samples/data augmentation)
@@ -279,7 +294,7 @@ class A2CStrategy(RLBaseStrategy):
             # policy_only forward?
             print("Sampling action!", observations.shape, observations.dtype)
             _, policy_logits = self.model(observations, compute_value=False)
-        # FIXME: remove item and add vecenv
+        # FIXME: remove item and add vecenv (alternative np.random.choice(num_outputs, p=np.squeeze(dist)))
         return Categorical(logits=policy_logits).sample().item()
 
     def update(self, rollouts: List[Rollout], n_update_steps: int):
@@ -294,6 +309,8 @@ class A2CStrategy(RLBaseStrategy):
             # compute next states values
             next_values, _ = self.model(
                 rollout.next_observations, compute_policy=False)
+            # mask terminal states values
+            next_values[rollout.dones] = 0.
 
             # print("Rollout Rewards shape", rollout.rewards.shape)
             # Actor/Policy Loss Term in A2C: A(s_t, a_t) * grad log (pi(a_t|s_t))
@@ -302,10 +319,11 @@ class A2CStrategy(RLBaseStrategy):
             policy_loss = -(advantages * log_prob).mean()
 
             # Value Loss Term: R_t + gamma * V(S_{t+1}) - V(S_t
-            # value_loss = advantages.pow(2) - values
+            # value_loss = advantages.pow(2)
             value_loss = self.value_criterion(boostrapped_returns, values)
 
             loss = self.ac_w * policy_loss + self.cr_w * value_loss
+            # TODO: accumulate gradients for multi-rollout case
             self.optimizer.zero_grad()
             # TODO: call hooks
             loss.backward()
