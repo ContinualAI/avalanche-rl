@@ -97,3 +97,10 @@ class StrategyPlugin(StrategyCallbacks[Any]):
 
     def after_eval_iteration(self, strategy: 'BaseStrategy', **kwargs):
         pass
+
+    # RLBaseStrategy callbacks
+    def before_rollout(self, strategy: 'BaseStrategy', **kwargs):
+        pass
+
+    def after_rollout(self, strategy: 'BaseStrategy', **kwargs):
+        pass

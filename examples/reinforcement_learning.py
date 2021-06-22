@@ -44,7 +44,7 @@ if __name__ == "__main__":
     # strategy = RLStrategy('MlpPolicy', [scenario.envs[0]], 'dqn', None, per_experience_episodes=3, eval_mb_size=1, device=device, )
 
     optimizer = Adam(model.parameters(), lr=1e-4)
-    strategy = A2CStrategy(model, optimizer, per_experience_steps=100000, )
+    strategy = A2CStrategy(model, optimizer, per_experience_steps=1, )
 
     # TRAINING LOOP
     print('Starting experiment...')
