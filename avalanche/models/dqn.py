@@ -1,6 +1,20 @@
 import torch.nn as nn
 import torch
 import torch.nn.functional as F
+from .simple_mlp import SimpleMLP
+
+
+class MLPDeepQN(SimpleMLP):
+    """
+    Simple Action-Value MLP for DQN.
+    """
+
+    def __init__(
+            self, input_size: int, hidden_size: int, n_actions: int,
+            hidden_layers: int = 1):
+        # it does use dropout
+        super().__init__(num_classes=n_actions, input_size=input_size,
+                         hidden_size=hidden_size, hidden_layers=hidden_layers)
 
 
 class ConvDeepQN(nn.Module):

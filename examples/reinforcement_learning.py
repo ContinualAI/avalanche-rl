@@ -1,6 +1,7 @@
-from avalanche.training.strategies.reinforcement_learning import A2CStrategy, RLBaseStrategy
+from avalanche.training.strategies.reinforcement_learning import A2CStrategy, RLBaseStrategy, DQNStrategy
 from avalanche.training.strategies.rl_utils import Array2Tensor
 from avalanche.models.actor_critic import ActorCriticMLP
+from avalanche.models.dqn import ConvDeepQN, MLPDeepQN
 from avalanche.benchmarks.scenarios.generic_definitions import Experience
 from torch.optim import SGD, Adam
 from torch.nn import CrossEntropyLoss
@@ -34,17 +35,23 @@ def evaluate(model: torch.nn.Module, n_episodes=10):
         lengths.append(t)
     return np.mean(rewards), np.std(rewards), np.mean(lengths)
 
+
 if __name__ == "__main__":
     device = torch.device('cuda:0')
     # TODO: benchmark should make Env parallel?
-    scenario = gym_benchmark_generator(['CartPole-v1']) # ['CartPole-v0', 'CartPole-v1'..]
+    # ['CartPole-v0', 'CartPole-v1'..]
+    scenario = gym_benchmark_generator(['CartPole-v1'])
     # CartPole setting
-    model = ActorCriticMLP(4, 2, 1024)
+    # model = ActorCriticMLP(4, 2, 1024)
+    model = MLPDeepQN(input_size=4, hidden_size=64, n_actions=2, hidden_layers=2)
     # cl_strategy = Naive(model, optim, )
     # strategy = RLStrategy('MlpPolicy', [scenario.envs[0]], 'dqn', None, per_experience_episodes=3, eval_mb_size=1, device=device, )
 
     optimizer = Adam(model.parameters(), lr=1e-4)
-    strategy = A2CStrategy(model, optimizer, per_experience_steps=1, )
+    # strategy = A2CStrategy(model, optimizer, per_experience_steps=1, )
+    strategy = DQNStrategy(
+        model, optimizer, 100000, batch_size=64, exploration_fraction=.2,
+        double_dqn=False, target_net_update_interval=100, polyak_update_tau=1.)
 
     # TRAINING LOOP
     print('Starting experiment...')

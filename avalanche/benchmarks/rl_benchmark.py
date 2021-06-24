@@ -180,6 +180,11 @@ class RLExperience(GenericExperience[RLScenario,
     @property
     def environment(self) -> Env:
         return self.env
+    
+    #FIXME: implement or make env return vectorizedenv with n inside
+    @property
+    def n_envs(self) -> Env:
+        return 1
 
     # FIXME: can't be None
     @property

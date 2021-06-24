@@ -7,7 +7,7 @@ import gym
 from gym import Env
 from avalanche.benchmarks.rl_benchmark import RLExperience, RLScenario
 from typing import Union, Optional, Sequence, List, Dict, Tuple
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import numpy as np
 from avalanche.training.plugins.strategy_plugin import StrategyPlugin
 from avalanche.training.strategies.rl_utils import *
@@ -25,70 +25,88 @@ class Step:
     dones: Union[bool, np.ndarray]
     rewards: Union[float, np.ndarray]
     next_states: Union[np.ndarray, torch.Tensor]
+    _post_init:bool = True
 
     def __post_init__(self):
+        if not self._post_init:
+            return
         # make sure no graph's ever attached by mistake
         for k in self.__annotations__:
             var = getattr(self, k)
             if type(var) is torch.Tensor:
-                setattr(self, k, var.detach())
+                var = var.detach()
+                if var.ndim == 1:
+                    var = var.view(1, -1)
+            elif type(var) is np.ndarray:
+                if var.ndim == 1:
+                    # add n_envs dimension if not present
+                    var = var.reshape(1, -1)
+            elif type(var) is not torch.tensor:
+                var = torch.tensor(var).reshape(1, -1)
+
+            setattr(self, k, var)
+
     @property
     def n_envs(self):
         # FIXME: return self.states.shape[0] 
         return 1
 
+    def __getitem__(self, actor_idx: int):
+        """ Slice an actor step over the n_envs dimension by returning i-th array of each attribute. """
+        if actor_idx >= self.n_envs:
+            raise IndexError(
+                f'indx {actor_idx} is out of bound for axis with size {self.n_envs} (number of parallel envs).')
+        return tuple(getattr(self, k)[actor_idx, ...]
+                     for k in self.__annotations__ if k != '_post_init')
+
 
 @dataclass
 class Rollout:
     steps: List[Step]
+    n_envs: int
 
-    @property
-    def n_envs(self):
-        return self.steps[0].n_envs
+    def _get_scalar(self, attr: str, type_: str):
+        if not len(self.steps):
+            return []
+        # batch dimension over number of parallel environments, instatiate transpose for faster assignment
+        mlib = torch if type(getattr(self.steps[0], attr)) is torch.Tensor else np
+        # check whether we need to add n_envs dimension
+        shape = (len(self.steps), self.n_envs) if self.n_envs > 0 else (len(self.steps),)
+        rwds = mlib.zeros(
+            shape,
+            dtype=getattr(mlib, type_))
+        for i, step in enumerate(self.steps):
+            rwds[i] = step.rewards
+        return rwds.T
 
     @property
     def rewards(self):
         """
             Returns all rewards gathered at each step of this rollout.
         """
-        # batch dimension over number of parallel environments, instatiate transpose for faster assignment
-        rwds = torch.zeros(
-            (len(self.steps), self.n_envs),
-            dtype=torch.float32)
-        for i, step in enumerate(self.steps):
-            rwds[i] = step.rewards
-        return rwds.T
+        return self._get_scalar('rewards', 'float32')
 
     @property
     def dones(self):
         """
             Returns terminal state flag of each step of this rollout.
         """
-        # batch dimension over number of parallel environments, instatiate transpose for faster assignment
-        dones = torch.zeros(
-            (len(self.steps), self.n_envs),
-            dtype=torch.float32)
-        for i, step in enumerate(self.steps):
-            dones[i] = step.dones
-        return dones.bool().T
+        return self._get_scalar('dones', 'bool')
+
 
     @property
     def actions(self):
         """
             Returns all actions taken at each step of this rollout.
         """
-        # batch dimension over number of parallel environments, instatiate transpose for faster assignment
-        actions = torch.zeros(
-            (len(self.steps), self.n_envs),
-            dtype=torch.float32)
-        for i, step in enumerate(self.steps):
-            actions[i] = step.actions
-        return actions.T
+        return self._get_scalar('actions', 'int64')
 
     def _get_obs(self, prop_name: str, as_tensor=True):
         """
             Returns all observations gathered at each step of this rollout.
         """
+        if not len(self.steps):
+            return []
         mlib = torch if as_tensor else np
         obs = mlib.zeros(
             (len(self.steps), *self.steps[0].states.shape),
@@ -119,40 +137,41 @@ class Rollout:
 @dataclass
 class ReplayMemory:
     # like a Rollout but with time-indipendent Steps 
-    _memory: List[Step]
     """ Max number of Steps contained inside memory. When trying to add a new Step and size is reached, a previous Step is replaced. """
     size: int
+    n_envs: int
     steps_counter: int = 0
+    _memory: List[Step] = field(default_factory=lambda: [])
 
-    @property
-    def n_envs(self):
-        return self._memory[0].n_envs
+    def _unravel_step(self, step: Step):
+        for actor_no in range(step.n_envs):
+            # avoid adding n_env dimension
+            yield Step(*step[actor_no], _post_init=False)
+
 
     def add_rollouts(self, rollouts: List[Rollout]):
         """
-            Adds a list of rollouts to the memory, "merging" n_envs and timestep 
-            dimension so that we can sample more efficiently from a simple list 
-            of steps (n x t x D -> (n+t) x D) and handle overwriting of new experience.
+            Adds a list of rollouts to the memory disentangling steps coming from
+            parallel environments/actors so that we can sample more efficiently from 
+            a simple list of steps and handle replacing of new experience.
 
         Args:
             rollouts (List[Rollout]): [description]
         """
         # increase sample counter counting data from different actors as separate samples
         for rollout in rollouts:
-            new_sc = rollout.n_envs * len(rollout.steps)
-            for s, i in enumerate(
-                                  range(
-                                      self.steps_counter, self.steps_counter +
-                                      new_sc)):
-                if i < self.size:
-                    self._memory.append(rollout.steps[s])
-                else:
-                    self._memory[i % self.size] = rollout.steps[s]
+            for step in rollout.steps:
+                for actor_step in self._unravel_step(step):
+                    if self.steps_counter < self.size:
+                        self._memory.append(actor_step)
+                    else:
+                        self._memory[self.steps_counter %
+                                     self.size] = actor_step
+                    self.steps_counter += 1
 
-            self.steps_counter += new_sc
-
-    def sample_batch(self, batch_dim: int):
-        """Sample a batch of Steps of shape B x D where 
+    def sample_batch(self, batch_dim: int) -> Rollout:
+        """Sample a batch of random Steps, returned as a Rollout with time independent Steps
+        and no n_envs dimension unsqueezing. 
 
         Args:
             batch_dim (int): [description]
@@ -160,7 +179,9 @@ class ReplayMemory:
         Returns:
             [type]: [description]
         """
-        return np.random.choice(self._memory, size=batch_dim, replace=False)
+        return Rollout(np.random.choice(
+                           self._memory, size=batch_dim,
+                        replace=False).tolist(), n_envs=-1)
 
 
 class TimestepUnit(enum.IntEnum):
@@ -174,6 +195,8 @@ class Timestep:
     unit: TimestepUnit = TimestepUnit.STEPS
 
 # TODO: evaluation
+
+
 class RLBaseStrategy(BaseStrategy):
     def __init__(
                 self, model: nn.Module, optimizer: Optimizer, per_experience_steps: Union[int, Timestep], criterion=nn.MSELoss(),
@@ -226,6 +249,8 @@ class RLBaseStrategy(BaseStrategy):
             done = False
             while not done:
                 action = self.sample_rollout_action(self._obs) 
+                # FIXME: returning item for now
+                action = action.item()
                 # TODO: handle automatic reset for parallel envs with different lenght (must concatenate different episodes)
                 next_obs, reward, done, _ = env.step(action)
                 step_experiences.append(
@@ -238,10 +263,10 @@ class RLBaseStrategy(BaseStrategy):
                     break
                 if max_steps > 0 and t >= max_steps:
                     break
-            rollouts.append(Rollout(step_experiences))
+            rollouts.append(Rollout(step_experiences, n_envs=self.n_envs))
         return rollouts, t
 
-    def update(self, rollouts: List[Rollout], n_update_steps: int, **kwargs):
+    def update(self, rollouts: List[Rollout], n_update_steps: int):
         raise NotImplementedError(
             "`update` must be implemented by every RL strategy")
 
@@ -289,6 +314,7 @@ class RLBaseStrategy(BaseStrategy):
 
     def train_exp(self, experience: RLExperience, eval_streams=None, **kwargs):
         self.environment = experience.environment
+        self.n_envs = experience.n_envs
         self.rollout_steps = 0
 
         # Data Adaptation (e.g. add new samples/data augmentation)
@@ -383,7 +409,7 @@ class A2CStrategy(RLBaseStrategy):
         # FIXME: remove item and add vecenv (alternative np.random.choice(num_outputs, p=np.squeeze(dist)))
         return Categorical(logits=policy_logits).sample().item()
 
-    def update(self, rollouts: List[Rollout], n_update_steps: int, **kwargs):
+    def update(self, rollouts: List[Rollout], n_update_steps: int):
         # perform gradient step(s) over batch of gathered rollouts
         # TODO: rollout buffer to avoid loop
         # TODO: before/after forward
@@ -417,7 +443,7 @@ class A2CStrategy(RLBaseStrategy):
             self.loss += self.ac_w * policy_loss + self.cr_w * value_loss
 
 
-class DQN(RLBaseStrategy):
+class DQNStrategy(RLBaseStrategy):
 
     def __init__(
             self, model: nn.Module, optimizer: Optimizer,
@@ -433,14 +459,13 @@ class DQN(RLBaseStrategy):
             exploration_fraction: float = 0.1,
             double_dqn: bool = True,
             target_net_update_interval: Union[int, Timestep] = 10000,
-            polyak_update_tau: float = 0.01, # set to 1. to hard copy
+            polyak_update_tau: float = 0.01,  # set to 1. to hard copy
             discount_factor: float = 0.99,
             device='cpu',
             plugins: Optional[Sequence[StrategyPlugin]] = [],
             eval_every=-1):
         super().__init__(
             model, optimizer, per_experience_steps, criterion=criterion,
-            per_experience_steps=per_experience_steps,
             rollouts_per_step=rollouts_per_step,
             updates_per_step=updates_per_step, device=device, plugins=plugins,
             discount_factor=discount_factor, eval_every=eval_every)
@@ -453,7 +478,7 @@ class DQN(RLBaseStrategy):
         self.replay_size = replay_memory_size
         self.batch_dim = batch_size
         self.double_dqn = double_dqn
-        self.target_net_update_interval:Timestep = target_net_update_interval
+        self.target_net_update_interval: Timestep = target_net_update_interval
         self.polyak_update_tau = polyak_update_tau
         assert initial_epsilon >= final_epsilon, "Initial epsilon value must be greater or equal than final one"
 
@@ -461,8 +486,8 @@ class DQN(RLBaseStrategy):
         self.eps = initial_epsilon
         self.final_eps = final_epsilon
         # compute linear decay rate from specified fraction and specified timestep unit
-        self.eps_decay = (
-            self._init_eps - self.final_eps) / (exploration_fraction * self.per_experience_steps.value) 
+        self.eps_decay = (self._init_eps - self.final_eps) / (
+            exploration_fraction * self.per_experience_steps.value)
 
         # initialize target network
         self.target_net = copy.deepcopy(self.model)
@@ -482,17 +507,23 @@ class DQN(RLBaseStrategy):
             # from stable baseline 3 enhancement https://github.com/DLR-RM/stable-baselines3/issues/93
             with torch.no_grad():
                 # all done in-place for efficiency
-                for param, target_param in zip(self.model.parameters(), self.target_net.parameters()):
+                for param, target_param in zip(
+                        self.model.parameters(),
+                        self.target_net.parameters()):
                     target_param.data.mul_(1-self.polyak_update_tau)
-                    torch.add(target_param.data, param.data, alpha=self.polyak_update_tau, out=target_param.data)
+                    torch.add(target_param.data, param.data,
+                              alpha=self.polyak_update_tau,
+                              out=target_param.data)
 
     def before_training_exp(self, **kwargs):
-        # initialize replay memory with collected data before training on new env
-        rollouts = self.rollout(
+        # initialize replay memory with collected data before training on new env, taking into account multiple workers
+        rollouts, _ = self.rollout(
             self.environment, self.replay_init_size,
-            max_steps=self.replay_init_size)
+            max_steps=self.replay_init_size//self.n_envs) 
         if self.replay_memory is None:
-            self.replay_memory = ReplayMemory(size=self.replay_size)
+            self.replay_memory = ReplayMemory(
+                size=self.replay_size, n_envs=self.n_envs)
+
         self.replay_memory.add_rollouts(rollouts)
 
     def before_rollout(self, **kwargs):
@@ -512,7 +543,7 @@ class DQN(RLBaseStrategy):
         """
             Generate action following epsilon-greedy strategy in which we either sample
             a random action with probability epsilon or we exploit current Q-value derived
-            policy by taking the action with greater Q-value.
+            policy by taking the action with greatest Q-value.
 
         Args:
             observations (torch.Tensor): [description]
@@ -526,13 +557,13 @@ class DQN(RLBaseStrategy):
         else:
             actions = [
                 self.environment.action_space.sample()
-                for i in range(self.environment.action_space.n)]
+                for _ in range(self.n_envs)]
             actions = np.asarray(actions, dtype=np.int32)
-        # actors run on cpu, return numpy array 
+        # actors run on cpu, return numpy array #
         return actions
 
     @torch.no_grad()
-    def _compute_next_q_values(self, batch):
+    def _compute_next_q_values(self, batch: Rollout):
         # Compute next state q values using fixed target net
         next_q_values = self.target_net(batch.next_observations)
 
@@ -553,9 +584,15 @@ class DQN(RLBaseStrategy):
         return next_q_values
 
     def update(self, rollouts: List[Rollout], n_update_steps: int):
-        for i in range(n_update_steps):
+        for _ in range(n_update_steps):
             # sample batch of steps/experiences from memory
             batch = self.replay_memory.sample_batch(self.batch_dim)
+            
+            for step in batch.steps:
+                print(step.states.shape)
+                break
+            print('obs shape', batch.observations.shape,'act', batch.actions.shape)
+
             # compute q values prediction for whole batch: Q(s, a)
             q_pred = self.model(batch.observations)
             # condition on taken actions (select performed actions' q-values)
@@ -569,6 +606,6 @@ class DQN(RLBaseStrategy):
             q_target = batch.rewards + self.gamma * \
                 (1 - batch.dones) * next_q_values
 
-            loss = self._criterion(q_pred, q_target)
+            self.loss = self._criterion(q_pred, q_target)
 
             # TODO: gradient norm clipping?

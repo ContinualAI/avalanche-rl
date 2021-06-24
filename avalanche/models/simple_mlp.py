@@ -35,6 +35,7 @@ class SimpleMLP(nn.Module):
         self._input_size = input_size
 
     def forward(self, x):
+        print
         x = x.contiguous()
         x = x.view(x.size(0), self._input_size)
         x = self.features(x)
