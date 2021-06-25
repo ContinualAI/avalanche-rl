@@ -74,6 +74,7 @@ class Step:
 class Rollout:
     steps: List[Step]
     n_envs: int
+    _device: torch.device = torch.device('cpu')
 
     def _get_scalar(self, attr: str, type_: str):
         if not len(self.steps):
@@ -89,7 +90,7 @@ class Rollout:
 
         values = mlib.zeros(
             shape,
-            dtype=getattr(mlib, type_))
+            dtype=getattr(mlib, type_)).to(self._device)
         # FIXME: should only loop ONCE through all steps and retrieve all values (cache)
         for i, step in enumerate(self.steps):
             values[i] = getattr(step, attr)
@@ -125,7 +126,7 @@ class Rollout:
         mlib = torch if as_tensor else np
         obs = mlib.zeros(
             (len(self.steps), *self.steps[0].states.shape),
-            dtype=mlib.float32)
+            dtype=mlib.float32).to(self._device)
         for i, step in enumerate(self.steps):
             obs[i] = getattr(step, prop_name)
 
@@ -145,7 +146,8 @@ class Rollout:
         """
             Should only do this before processing to avoid filling gpu with replay memory.
         """
-        return Rollout([step.to(device) for step in self.steps], n_envs=self.n_envs)
+        return Rollout([step.to(device) for step in self.steps],
+                       n_envs=self.n_envs, _device=device)
 
 
 @dataclass
@@ -182,9 +184,12 @@ class ReplayMemory:
                                      self.size] = actor_step
                     self.steps_counter += 1
 
-    def sample_batch(self, batch_dim: int) -> Rollout:
-        """Sample a batch of random Steps, returned as a Rollout with time independent Steps
-        and no n_envs dimension unsqueezing. 
+    def sample_batch(self, batch_dim: int, device: torch.device) -> Rollout:
+        """
+            Sample a batch of random Steps, returned as a Rollout with time independent Steps
+            and no n_envs dimension unsqueezing. 
+            Batch is also moved to device just before processing so that we don't risk
+            filling GPU with replay memory samples.
 
         Args:
             batch_dim (int): [description]
@@ -192,9 +197,9 @@ class ReplayMemory:
         Returns:
             [type]: [description]
         """
-        return Rollout(np.random.choice(
+        return Rollout([s.to(device) for s in np.random.choice(
                            self._memory, size=batch_dim,
-                        replace=False).tolist(), n_envs=-1)
+                        replace=False)], n_envs=-1)
 
 
 class TimestepUnit(enum.IntEnum):
@@ -262,7 +267,9 @@ class RLBaseStrategy(BaseStrategy):
             done = False
             while not done:
                 # FIXME: Remove and add vecenv
-                action = self.sample_rollout_action(self._obs.unsqueeze(0)) 
+                # sample action from policy moving observation to device
+                action = self.sample_rollout_action(
+                    self._obs.unsqueeze(0).to(self.device))
                 # FIXME: returning item for now
                 action = action.item()
                 # TODO: handle automatic reset for parallel envs with different lenght (must concatenate different episodes)
@@ -415,8 +422,6 @@ class A2CStrategy(RLBaseStrategy):
         Returns:
             [type]: [description]
         """
-        # FIXME: automatic?
-        observations = observations.to(self.device)
         # sample action from policy network
         with torch.no_grad():
             _, policy_logits = self.model(observations, compute_value=False)
@@ -428,6 +433,8 @@ class A2CStrategy(RLBaseStrategy):
         # TODO: rollout buffer to avoid loop
         self.loss = 0.
         for rollout in rollouts:
+            # move samples to device for processing
+            rollout = rollout.to(self.device)
             # print("Rollout Observation shape", rollout.observations.shape)
             values, policy_logits = self.model(rollout.observations)
             # ~log(softmax(action_logits))
@@ -510,7 +517,7 @@ class DQNStrategy(RLBaseStrategy):
             fraction of the total timesteps (`exploration_fraction`).
             This will reset to `self._init_eps` on new experience.
         """
-        #TODO: log this values
+        # TODO: log this values
         new_value = self._init_eps - experience_timestep * self.eps_decay
         self.eps = new_value if new_value > self.final_eps else self.final_eps
 
@@ -600,7 +607,7 @@ class DQNStrategy(RLBaseStrategy):
     def update(self, rollouts: List[Rollout], n_update_steps: int):
         for _ in range(n_update_steps):
             # sample batch of steps/experiences from memory
-            batch = self.replay_memory.sample_batch(self.batch_dim)
+            batch = self.replay_memory.sample_batch(self.batch_dim, self.device)
 
             # print('obs shape', batch.observations.shape,'act', batch.actions.shape)
 
