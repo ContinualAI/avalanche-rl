@@ -25,11 +25,8 @@ def evaluate(model: torch.nn.Module, n_episodes=10):
         done = False
         t = 0
         while not done:
-            # TODO: put inside model
-            with torch.no_grad():
-                _, logits = model(obs, compute_value=False)
-            action = Categorical(logits=logits).sample().item()
-            obs, r, done, _ = env.step(action)
+            action = model.get_action(obs.unsqueeze(0))
+            obs, r, done, _ = env.step(action.item())
             rewards.append(r)
             t += 1
         lengths.append(t)
@@ -37,21 +34,26 @@ def evaluate(model: torch.nn.Module, n_episodes=10):
 
 
 if __name__ == "__main__":
-    device = torch.device('cuda:0')
+    # TODO: change
+    device = torch.device('cpu')
     # TODO: benchmark should make Env parallel?
     # ['CartPole-v0', 'CartPole-v1'..]
     scenario = gym_benchmark_generator(['CartPole-v1'])
     # CartPole setting
-    # model = ActorCriticMLP(4, 2, 1024)
-    model = MLPDeepQN(input_size=4, hidden_size=64, n_actions=2, hidden_layers=2)
+    # model = ActorCriticMLP(4, 2, 128)
+    model = MLPDeepQN(input_size=4, hidden_size=64,
+                      n_actions=2, hidden_layers=2)
     # cl_strategy = Naive(model, optim, )
     # strategy = RLStrategy('MlpPolicy', [scenario.envs[0]], 'dqn', None, per_experience_episodes=3, eval_mb_size=1, device=device, )
 
     optimizer = Adam(model.parameters(), lr=1e-4)
-    # strategy = A2CStrategy(model, optimizer, per_experience_steps=1, )
+    # strategy = A2CStrategy(
+    # model, optimizer, per_experience_steps=10000, max_steps_per_rollout=1,
+    # device=device)
     strategy = DQNStrategy(
-        model, optimizer, 100000, batch_size=64, exploration_fraction=.2,
-        double_dqn=False, target_net_update_interval=100, polyak_update_tau=1.)
+        model, optimizer, 1000, batch_size=32, exploration_fraction=.2,
+        replay_memory_size=1000, updates_per_step=10, replay_memory_init_size=500, double_dqn=False,
+        target_net_update_interval=10, polyak_update_tau=1.)
 
     # TRAINING LOOP
     print('Starting experiment...')

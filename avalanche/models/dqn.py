@@ -3,7 +3,6 @@ import torch
 import torch.nn.functional as F
 from .simple_mlp import SimpleMLP
 
-
 class MLPDeepQN(SimpleMLP):
     """
     Simple Action-Value MLP for DQN.
@@ -15,6 +14,11 @@ class MLPDeepQN(SimpleMLP):
         # it does use dropout
         super().__init__(num_classes=n_actions, input_size=input_size,
                          hidden_size=hidden_size, hidden_layers=hidden_layers)
+
+    @torch.no_grad()
+    def get_action(self, observation: torch.Tensor):
+        q_values = self(observation)
+        return torch.argmax(q_values, dim=1).cpu().int().numpy()
 
 
 class ConvDeepQN(nn.Module):
@@ -53,3 +57,10 @@ class ConvDeepQN(nn.Module):
             x = self.conv3(x)
         print("Size of flattened input to fully connected layer:", x.flatten().shape)
         return x.squeeze(0).flatten().shape[0]
+
+    # FIXME: inherit
+    @torch.no_grad()
+    def get_action(self, observation: torch.Tensor):
+        q_values = self(observation)
+        return torch.argmax(q_values, dim=1).cpu().int().numpy()
+

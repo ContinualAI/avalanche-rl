@@ -25,13 +25,15 @@ class Step:
     dones: Union[bool, np.ndarray]
     rewards: Union[float, np.ndarray]
     next_states: Union[np.ndarray, torch.Tensor]
-    _post_init:bool = True
+    _post_init: bool = True
 
     def __post_init__(self):
         if not self._post_init:
             return
         # make sure no graph's ever attached by mistake
         for k in self.__annotations__:
+            if k == '_post_init':
+                continue
             var = getattr(self, k)
             if type(var) is torch.Tensor:
                 var = var.detach()
@@ -59,6 +61,14 @@ class Step:
         return tuple(getattr(self, k)[actor_idx, ...]
                      for k in self.__annotations__ if k != '_post_init')
 
+    def to(self, device: torch.device):
+        return Step(
+            *
+            (
+                getattr(self, k).to(device) for k in self.__annotations__
+                if k != '_post_init'),
+            _post_init=False)
+
 
 @dataclass
 class Rollout:
@@ -69,15 +79,21 @@ class Rollout:
         if not len(self.steps):
             return []
         # batch dimension over number of parallel environments, instatiate transpose for faster assignment
-        mlib = torch if type(getattr(self.steps[0], attr)) is torch.Tensor else np
+        mlib = torch if type(
+            getattr(self.steps[0], attr)) is torch.Tensor else np
         # check whether we need to add n_envs dimension
-        shape = (len(self.steps), self.n_envs) if self.n_envs > 0 else (len(self.steps),)
-        rwds = mlib.zeros(
+        shape = (
+            len(self.steps),
+            self.n_envs) if self.n_envs > 0 else(
+            len(self.steps),)
+
+        values = mlib.zeros(
             shape,
             dtype=getattr(mlib, type_))
+        # FIXME: should only loop ONCE through all steps and retrieve all values (cache)
         for i, step in enumerate(self.steps):
-            rwds[i] = step.rewards
-        return rwds.T
+            values[i] = getattr(step, attr)
+        return values.T
 
     @property
     def rewards(self):
@@ -92,7 +108,6 @@ class Rollout:
             Returns terminal state flag of each step of this rollout.
         """
         return self._get_scalar('dones', 'bool')
-
 
     @property
     def actions(self):
@@ -126,12 +141,11 @@ class Rollout:
     def next_observations(self):
         return self._get_obs('next_states')
 
-    def squeeze_timestep_dimension(self):
+    def to(self, device: torch.device):
         """
-            Reshapes gathered steps from n x t x D to (n+t) x D where n = n_envs 
-            and t is the length of the rollout.
+            Should only do this before processing to avoid filling gpu with replay memory.
         """
-        pass
+        return Rollout([step.to(device) for step in self.steps], n_envs=self.n_envs)
 
 
 @dataclass
@@ -147,7 +161,6 @@ class ReplayMemory:
         for actor_no in range(step.n_envs):
             # avoid adding n_env dimension
             yield Step(*step[actor_no], _post_init=False)
-
 
     def add_rollouts(self, rollouts: List[Rollout]):
         """
@@ -248,11 +261,13 @@ class RLBaseStrategy(BaseStrategy):
                 self._obs = env.reset()
             done = False
             while not done:
-                action = self.sample_rollout_action(self._obs) 
+                # FIXME: Remove and add vecenv
+                action = self.sample_rollout_action(self._obs.unsqueeze(0)) 
                 # FIXME: returning item for now
                 action = action.item()
                 # TODO: handle automatic reset for parallel envs with different lenght (must concatenate different episodes)
                 next_obs, reward, done, _ = env.step(action)
+
                 step_experiences.append(
                     Step(self._obs, action, done, reward, next_obs))
                 t += 1
@@ -343,7 +358,8 @@ class RLBaseStrategy(BaseStrategy):
             # update must instatiate `self.loss`
             self.update(self.rollouts, self.updates_per_step)
 
-            # Loss & Backward
+            # Backward
+            self.optimizer.zero_grad()
             self.before_backward(**kwargs)
             self.loss.backward()
             self.after_backward(**kwargs)
@@ -352,7 +368,7 @@ class RLBaseStrategy(BaseStrategy):
             self.before_update(**kwargs)
             self.optimizer.step()
             self.after_update(**kwargs)
-
+        print("Steps performed", self.timestep+1)
         self.total_steps += self.rollout_steps
 
 
@@ -399,22 +415,18 @@ class A2CStrategy(RLBaseStrategy):
         Returns:
             [type]: [description]
         """
+        # FIXME: automatic?
+        observations = observations.to(self.device)
         # sample action from policy network
-        # FIXME: Remove and add vecenv
-        observations = observations.unsqueeze(0)
         with torch.no_grad():
-            # policy_only forward?
-            print("Sampling action!", observations.shape, observations.dtype)
             _, policy_logits = self.model(observations, compute_value=False)
-        # FIXME: remove item and add vecenv (alternative np.random.choice(num_outputs, p=np.squeeze(dist)))
-        return Categorical(logits=policy_logits).sample().item()
+        # (alternative np.random.choice(num_outputs, p=np.squeeze(dist)))
+        return Categorical(logits=policy_logits).sample()
 
     def update(self, rollouts: List[Rollout], n_update_steps: int):
         # perform gradient step(s) over batch of gathered rollouts
         # TODO: rollout buffer to avoid loop
-        # TODO: before/after forward
-        self.optimizer.zero_grad()
-        self.loss = 0
+        self.loss = 0.
         for rollout in rollouts:
             # print("Rollout Observation shape", rollout.observations.shape)
             values, policy_logits = self.model(rollout.observations)
@@ -498,6 +510,7 @@ class DQNStrategy(RLBaseStrategy):
             fraction of the total timesteps (`exploration_fraction`).
             This will reset to `self._init_eps` on new experience.
         """
+        #TODO: log this values
         new_value = self._init_eps - experience_timestep * self.eps_decay
         self.eps = new_value if new_value > self.final_eps else self.final_eps
 
@@ -546,7 +559,8 @@ class DQNStrategy(RLBaseStrategy):
             policy by taking the action with greatest Q-value.
 
         Args:
-            observations (torch.Tensor): [description]
+            observations (torch.Tensor): Observation coming from Env on previous step, 
+            of shape `self.n_envs` x obs_shape.
         """ 
         # all actors interacting with environment either exploit or explore
         if random.random() > self.eps:
@@ -587,24 +601,21 @@ class DQNStrategy(RLBaseStrategy):
         for _ in range(n_update_steps):
             # sample batch of steps/experiences from memory
             batch = self.replay_memory.sample_batch(self.batch_dim)
-            
-            for step in batch.steps:
-                print(step.states.shape)
-                break
-            print('obs shape', batch.observations.shape,'act', batch.actions.shape)
+
+            # print('obs shape', batch.observations.shape,'act', batch.actions.shape)
 
             # compute q values prediction for whole batch: Q(s, a)
             q_pred = self.model(batch.observations)
             # condition on taken actions (select performed actions' q-values)
             q_pred = torch.gather(
-                q_pred, dim=1, index=batch.actions.unsqueeze(-1))
+                q_pred, dim=1, index=batch.actions.unsqueeze(-1)).squeeze()
 
             # compute target Q value: Q*(s, a) = R_t + gamma * max_{a'} Q(s', a') 
             next_q_values = self._compute_next_q_values(batch)
 
             # mask terminal states only after max q value action has been selected
             q_target = batch.rewards + self.gamma * \
-                (1 - batch.dones) * next_q_values
+                (1 - batch.dones.int()) * next_q_values
 
             self.loss = self._criterion(q_pred, q_target)
 

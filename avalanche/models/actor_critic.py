@@ -1,6 +1,8 @@
 import torch.nn as nn
 import torch.nn.functional as F
 import torch
+from torch.distributions import Categorical
+
 
 class ActorCriticMLP(nn.Module):
     # adapted from https://towardsdatascience.com/understanding-actor-critic-methods-931b97b6df3f
@@ -24,3 +26,8 @@ class ActorCriticMLP(nn.Module):
             policy_logits = self.actor_linear2(policy_logits)
 
         return value, policy_logits
+
+    @torch.no_grad()
+    def get_action(self, observation: torch.Tensor):
+        _, policy_logits = self(observation, compute_value=False)
+        return Categorical(logits=policy_logits).sample()
