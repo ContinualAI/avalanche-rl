@@ -4,7 +4,7 @@ from typing import Callable, List, Union, Dict, Any
 import numpy as np
 import multiprocessing
 import types
-
+import torch
 # ref https://docs.ray.io/en/master/actors.html#creating-an-actor
 # https://stable-baselines3.readthedocs.io/en/master/guide/vec_envs.html
 
@@ -31,6 +31,7 @@ class Actor:
         next_obs, reward, done, info = self.env.step(action)
         # auto-reset episode: obs you get is actually the first of the new episode, 
         # while the last obs is kept inside info
+        info['actual_done'] = done
         if self.auto_reset and done:
             info['terminal_observation'] = next_obs.copy()
             next_obs = self.env.reset()
@@ -61,11 +62,18 @@ class Actor:
 
 
 class VectorizedEnvironment(object):
+    """Only supports numpy array to avoid facilitate object passing in distributed setting.
+
+    Args:
+        object ([type]): [description]
+    """
 
     def __init__(
-            self, envs: Union[Callable[[Dict[Any, Any]], gym.Env], List[gym.Env]],
-            n_envs: int, synchronized: bool = True, env_kwargs=dict(),
-            ray_kwargs={'num_cpus': multiprocessing.cpu_count()}) -> None:
+            self, envs: Union[Callable[[Dict[Any, Any]], gym.Env], List[gym.Env], gym.Env],
+            n_envs: int, env_kwargs=dict(), auto_reset: bool = True,
+            ray_kwargs={'num_cpus': multiprocessing.cpu_count()},
+            obs_to_tensors: bool = True
+            ) -> None:
         # Avoid passing over potentially big objects on the net, prefer creating 
         # env locally to each actor
         assert n_envs > 0, "Cannot initialize a VectorizedEnv with a non-positive number of environments"
@@ -73,27 +81,32 @@ class VectorizedEnvironment(object):
         ray.init(ignore_reinit_error=True, **ray_kwargs)
         self.n_envs = n_envs
         if isinstance(envs, types.FunctionType):
+            # each env will be copied over to shared memory if the object is provided
+            self.env = envs(**env_kwargs)
             envs = [envs] * self.n_envs
-        else:
+        elif isinstance(envs, gym.Env):
+            self.env = envs
+            envs = [envs] * self.n_envs
+        elif type(envs) is list:
             assert len(envs) == n_envs
             # envs = [lambda _ : envs[i] for i in range(n_envs)]
+
         # ray actor pool?
-        self.actors = [Actor.remote(envs[i], i, env_kwargs)
+        self.actors = [Actor.remote(
+                           envs[i],
+                           i, env_kwargs, auto_reset=auto_reset)
                        for i in range(n_envs)]
-        self.sync = synchronized
+
+        self.to_tensor = obs_to_tensors
 
     def _remote_vec_calls(self, fname: str, *args, **kwargs) -> Union[np.ndarray, List[Any]]:
         promises = [getattr(actor, fname).remote(*args, **kwargs)
                     for actor in self.actors]
-        if self.sync:
-            return np.asarray(ray.get(promises))  # .reshape(self.n_envs, -1)
-        return promises
+        return np.asarray(ray.get(promises))  # .reshape(self.n_envs, -1)
 
     def __getattr__(self, attr: str):
-        if hasattr(self.actors[0], attr):
-            def wrapper(*args, **kwargs): 
-                return self._remote_vec_calls(attr, *args, **kwargs)
-            return wrapper
+        if hasattr(self.env, attr):
+            return getattr(self.env, attr)
         else:
             raise AttributeError(attr)
 
@@ -101,16 +114,20 @@ class VectorizedEnvironment(object):
         assert actions.shape[0] == self.n_envs, 'First dimension must be equal to number of envs'
         promises = [actor.step.remote(actions[i])
                     for i, actor in enumerate(self.actors)]
-        if self.sync:
-            # here we assume Env step computation is approximately the same for 
-            # all envs. If that wasnt' the case, we should use https://docs.ray.io/en/latest/package-ref.html#ray.wait
-            step_results = [[] for _ in range(4)]
-            for actor_res in ray.get(promises):
-                for i in range(len(actor_res)):
-                    step_results[i].append(actor_res[i])
+        # here we assume Env step computation is approximately the same for 
+        # all envs. If that wasnt' the case, we should use https://docs.ray.io/en/latest/package-ref.html#ray.wait
+        step_results = [[] for _ in range(4)]
+        for actor_res in ray.get(promises):
+            for i in range(len(actor_res)):
+                step_results[i].append(actor_res[i])
 
-            return tuple(map(np.asarray, step_results))
-        return promises
+        actor_steps = list(map(np.asarray, step_results))
+
+        # terminal obs is NOT converted to tensor 
+        if self.to_tensor:
+            actor_steps[0] = torch.from_numpy(actor_steps[0])
+
+        return actor_steps
 
     def reset(self) -> np.ndarray:
         return self._remote_vec_calls('reset')
@@ -118,5 +135,11 @@ class VectorizedEnvironment(object):
     def render(self, mode='human') -> np.ndarray:
         return self._remote_vec_calls('render', mode=mode)
 
+    def seed(self, seed: int):
+        promises = [actor.seed.remote(seed) for actor in self.actors]
+        return ray.get(promises)
+
     def close(self):
+        promises = [actor.close.remote() for actor in self.actors]
+        ray.get(promises)
         ray.shutdown()

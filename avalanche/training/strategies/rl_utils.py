@@ -23,6 +23,21 @@ class RGB2GrayWrapper(ObservationWrapper):
         # single channel uint8 conversion
         return cv2.cvtColor(obs, cv2.COLOR_RGB2GRAY)
 
+class CropObservationWrapper(ObservationWrapper):
+    def __init__(self, env, resize_shape=(84, 84)):
+        super(CropObservationWrapper, self).__init__(env)
+        self.resize_shape = resize_shape
+        old_space = env.observation_space
+        self.observation_space = gym.spaces.Box(
+            low=(0 if old_space.dtype == np.uint8 else 0.),
+            high=(255 if old_space.dtype == np.uint8 else 1.),
+            shape=resize_shape,
+            dtype=old_space.dtype,
+        )
+
+    def observation(self, obs):
+        return cv2.resize(obs, self.resize_shape, interpolation=cv2.INTER_AREA)
+
 
 
 class BufferWrapper(ObservationWrapper):
@@ -53,9 +68,12 @@ class BufferWrapper(ObservationWrapper):
 
 class Array2Tensor(ObservationWrapper):
 
-    def __init__(self, env):
+    def __init__(self, env, add_n_envs_dim: bool=False):
         super(Array2Tensor, self).__init__(env)
+        self.add_dim = add_n_envs_dim
 
     def observation(self, observation):
         """convert observation"""
-        return torch.from_numpy(observation).float()
+        t = torch.from_numpy(observation).float()
+        t = t.unsqueeze(0) if self.add_dim else t
+        return t

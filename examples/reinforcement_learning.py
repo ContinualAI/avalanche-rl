@@ -34,7 +34,6 @@ def evaluate(model: torch.nn.Module, n_episodes=10, device= torch.device('cpu'))
 
 
 if __name__ == "__main__":
-    # TODO: change
     device = torch.device('cuda:0')
     # TODO: benchmark should make Env parallel?
     # ['CartPole-v0', 'CartPole-v1'..]

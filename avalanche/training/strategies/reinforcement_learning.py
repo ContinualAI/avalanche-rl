@@ -15,6 +15,7 @@ from collections import defaultdict
 import random
 import copy
 import enum
+from avalanche.training.strategies.reinforcement_learning.vectorized_env import VectorizedEnvironment
 
 
 @dataclass
@@ -265,6 +266,7 @@ class RLBaseStrategy(BaseStrategy):
             if self._obs is None:
                 self._obs = env.reset()
             done = False
+            # FIXME: done.any()/info actual done
             while not done:
                 # FIXME: Remove and add vecenv
                 # sample action from policy moving observation to device
@@ -303,7 +305,10 @@ class RLBaseStrategy(BaseStrategy):
 
     def make_env(self, **kwargs):
         # TODO: can be passed as argument to specify transformations
-        return Array2Tensor(self.environment)
+        # if we don't need a vectorized env,extra `n_envs` dimension is added anyway
+        if self.n_envs==1:
+            return Array2Tensor(self.environment, add_n_envs_dim=True)
+        return VectorizedEnvironment(self.environment, self.n_envs, auto_reset=True, obs_to_tensors=True)
 
     def train(self, experiences: Union[RLExperience, Sequence[RLExperience]],
               eval_streams: Optional[Sequence[Union[RLExperience,
@@ -377,6 +382,7 @@ class RLBaseStrategy(BaseStrategy):
             self.after_update(**kwargs)
         print("Steps performed", self.timestep+1)
         self.total_steps += self.rollout_steps
+        self.environment.close()
 
 
 from avalanche.models.actor_critic import ActorCriticMLP
