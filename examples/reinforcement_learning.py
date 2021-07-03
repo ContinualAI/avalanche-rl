@@ -14,7 +14,7 @@ from torch.distributions import Categorical
 import numpy as np
 
 
-def evaluate(model: torch.nn.Module, n_episodes=10, device= torch.device('cpu')):
+def evaluate(model: torch.nn.Module, n_episodes=10, device=torch.device('cpu')):
     # TODO: this must be a module
     print("Evaluating agent")
     env = gym.make('CartPole-v1')
@@ -37,23 +37,23 @@ if __name__ == "__main__":
     device = torch.device('cuda:0')
     # TODO: benchmark should make Env parallel?
     # ['CartPole-v0', 'CartPole-v1'..]
-    scenario = gym_benchmark_generator(['CartPole-v1'], n_parallel_envs=1)
+    scenario = gym_benchmark_generator(['CartPole-v1'], n_parallel_envs=2)
 
     # CartPole setting
     model = ActorCriticMLP(4, 2, 128)
     # model = MLPDeepQN(input_size=4, hidden_size=128,
-                    #   n_actions=2, hidden_layers=2)
+    #   n_actions=2, hidden_layers=2)
     # cl_strategy = Naive(model, optim, )
     # strategy = RLStrategy('MlpPolicy', [scenario.envs[0]], 'dqn', None, per_experience_episodes=3, eval_mb_size=1, device=device, )
     optimizer = Adam(model.parameters(), lr=1e-4)
-    # FIXME: it broke somewhere
+    # FIXME: it broke somewhere, check if auto_reset with n_env=1 is responsible 
     strategy = A2CStrategy(
-    model, optimizer, per_experience_steps=10000, max_steps_per_rollout=1,
-    device=device)
+        model, optimizer, per_experience_steps=10000, max_steps_per_rollout=1,
+        device=device)
     # strategy = DQNStrategy(
-        # model, optimizer, 100, batch_size=32, exploration_fraction=.2, rollouts_per_step=100,
-        # replay_memory_size=1000, updates_per_step=2, replay_memory_init_size=500, double_dqn=False,
-        # target_net_update_interval=10, polyak_update_tau=1.)
+    # model, optimizer, 100, batch_size=32, exploration_fraction=.2, rollouts_per_step=100,
+    # replay_memory_size=1000, updates_per_step=2, replay_memory_init_size=500, double_dqn=False,
+    # target_net_update_interval=10, polyak_update_tau=1.)
 
     # TRAINING LOOP
     print('Starting experiment...')

@@ -8,6 +8,7 @@ import types
 # ref https://docs.ray.io/en/master/actors.html#creating-an-actor
 # https://stable-baselines3.readthedocs.io/en/master/guide/vec_envs.html
 
+
 @ray.remote
 class Actor:
     # we can implement a3c version by having each actor own a copy of the network
@@ -25,16 +26,25 @@ class Actor:
         self.auto_reset = auto_reset
 
     def step(self, action: Union[float, int, np.ndarray]):
-        # actions are computed in batch by the policy network on main process, sending results
-        # to actors either over network (distributed) or shared memory (local)
+        """ Actions are computed in batch by the policy network on main process, 
+            then sent to actors either over network (distributed setting) or
+            shared memory (local setting) leveraging ray backend.
+        Args:
+            action (Union[float, int, np.ndarray]): [description]
+
+        Returns:
+            [type]: [description]
+        """
+        # try casting to numpy array
+        if type(action) is not np.ndarray:
+            action = np.array(action)
+        
         next_obs, reward, done, info = self.env.step(action)
         # auto-reset episode: obs you get is actually the first of the new episode, 
         # while the last obs is kept inside info
-        info['actual_done'] = done
         if self.auto_reset and done:
             info['terminal_observation'] = next_obs.copy()
             next_obs = self.env.reset()
-            done = False
         return next_obs, reward, done, info
 
     def reset(self):
@@ -76,7 +86,6 @@ class VectorizedEnvironment(object):
         # Avoid passing over potentially big objects on the net, prefer creating 
         # env locally to each actor
         assert n_envs > 0, "Cannot initialize a VectorizedEnv with a non-positive number of environments"
-
         ray.init(ignore_reinit_error=True, **ray_kwargs)
         self.n_envs = n_envs
         if isinstance(envs, types.FunctionType):
@@ -85,7 +94,7 @@ class VectorizedEnvironment(object):
             envs = [envs] * self.n_envs
         elif isinstance(envs, gym.Env):
             self.env = envs
-            envs = [envs] * self.n_envs
+            envs = [envs for _ in range(self.n_envs)]
         elif type(envs) is list:
             assert len(envs) == n_envs
             # envs = [lambda _ : envs[i] for i in range(n_envs)]
@@ -133,6 +142,7 @@ class VectorizedEnvironment(object):
         return ray.get(promises)
 
     def close(self):
-        promises = [actor.close.remote() for actor in self.actors]
-        ray.get(promises)
+        # FIXME:
+        # promises = [actor.close.remote() for actor in self.actors]
+        # ray.get(promises)
         ray.shutdown()

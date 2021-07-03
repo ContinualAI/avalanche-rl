@@ -37,7 +37,7 @@ class Step:
                 continue
             var = getattr(self, k)
             if type(var) is torch.Tensor:
-                var = var.detach()
+                var = var.cpu().detach()
                 if var.ndim == 1:
                     var = var.view(1, -1)
             elif type(var) is np.ndarray:
@@ -95,7 +95,7 @@ class Rollout:
         values = mlib.zeros(
             shape,
             dtype=getattr(mlib, type_)).to(self._device)
-        # FIXME: should only loop ONCE through all steps and retrieve all values (cache)
+        # FIXME: should only loop ONCE through all steps and retrieve all values (rewards/dones..) (cache) 
         for i, step in enumerate(self.steps):
             values[i] = getattr(step, attr)
         return values.T
@@ -135,8 +135,7 @@ class Rollout:
             obs[i] = getattr(step, prop_name)
 
         # batch dimension over number of parallel environments
-        # FIXME: think about batch dim for images return mlib.swapaxes(obs, 0, 1)
-        return obs
+        return mlib.swapaxes(obs, 0, 1)
 
     @property
     def observations(self):
@@ -152,6 +151,9 @@ class Rollout:
         """
         return Rollout([step.to(device) for step in self.steps],
                        n_envs=self.n_envs, _device=device)
+
+    def __len__(self):
+        return len(self.steps)
 
 
 @dataclass
@@ -259,7 +261,18 @@ class RLBaseStrategy(BaseStrategy):
         for p in self.plugins:
             p.after_rollout(self, **kwargs)
 
-    def sample_rollout_action(self, observations: torch.Tensor):
+    def sample_rollout_action(self, observations: torch.Tensor)->np.ndarray:
+        """Implements the action sampling a~Pi(s) where Pi is the parameterized
+           function we're trying to learn.
+           Output of this function should be a numpy array to comply with 
+           `VectorizedEnvironment` interface.
+
+        Args:
+            observations (torch.Tensor): batch of observations/state at current time t.
+
+        Returns:
+            np.ndarray: batch of actions to perform during rollout of shape `n_envs` x A.
+        """
         raise NotImplementedError(
             "`sample_rollout_action` must be implemented by every RL strategy")
 
@@ -296,35 +309,30 @@ class RLBaseStrategy(BaseStrategy):
                 self._obs.to(self.device))
 
             # observations returned are one for each parallel environment  
-            next_obs, reward, done, info = env.step(action)
+            next_obs, rewards, dones, info = env.step(action)
 
             step_experiences.append(
-                Step(self._obs, action, done, reward, next_obs))
+                Step(self._obs, action, dones, rewards, next_obs))
             t += 1
             self._obs = next_obs
 
             # Vectorized env auto resets on done by default, check this flag to count episodes
             # TODO: terminal_observation flag
             if n_rollouts > 0:
-                for eid in range(self.n_envs):
-                    # if both terminal conditions are defined, 
-                    # end episode even if we performed more than `max_steps`
-                    if info[eid]['actual_done'] or (
-                            max_steps > 0 and t % max_steps == 0):
-                        rollouts.append(
-                            Rollout(step_experiences, n_envs=self.n_envs))
-                        step_experiences = []
-                        rollout_counter += 1
-                        # self._obs = None
-                        break
+                # check if any actor has finished an episode or `max_steps` reached
+                if dones.any() or (max_steps > 0 and len(step_experiences) >= max_steps):
+                    rollouts.append(
+                        Rollout(step_experiences, n_envs=self.n_envs))
+                    step_experiences = []
+                    rollout_counter += 1
+                    # TODO: if not auto_reset: self._obs = env.reset
 
             # check terminal condition(s)
             if n_rollouts > 0 and rollout_counter >= n_rollouts:
                 break
 
-            if max_steps > 0 and t >= max_steps:
-                rollouts.append(
-                            Rollout(step_experiences, n_envs=self.n_envs))
+            if max_steps > 0 and n_rollouts <= 0 and t >= max_steps:
+                rollouts.append(Rollout(step_experiences, n_envs=self.n_envs))
                 break
 
         return rollouts, t
@@ -423,9 +431,9 @@ class RLBaseStrategy(BaseStrategy):
             self.before_update(**kwargs)
             self.optimizer.step()
             self.after_update(**kwargs)
-        print("Steps performed", self.timestep+1)
+        print("Timesteps performed:", self.timestep+1)
         self.total_steps += self.rollout_steps
-        self.environment.close()
+        # TODO: self.environment.close()
 
 
 from avalanche.models.actor_critic import ActorCriticMLP
@@ -448,7 +456,7 @@ class A2CStrategy(RLBaseStrategy):
         super().__init__(
             model, optimizer, per_experience_steps=per_experience_steps,
             # here we make sure we can only do steps not episodes
-            rollouts_per_step=max_steps_per_rollout,
+            rollouts_per_step=-1,
             max_steps_per_rollout=max_steps_per_rollout,
             updates_per_step=updates_per_step, device=device, plugins=plugins,
             discount_factor=discount_factor, eval_every=eval_every)
@@ -475,7 +483,7 @@ class A2CStrategy(RLBaseStrategy):
         with torch.no_grad():
             _, policy_logits = self.model(observations, compute_value=False)
         # (alternative np.random.choice(num_outputs, p=np.squeeze(dist)))
-        return Categorical(logits=policy_logits).sample()
+        return Categorical(logits=policy_logits).sample().cpu().numpy()
 
     def update(self, rollouts: List[Rollout], n_update_steps: int):
         # perform gradient step(s) over batch of gathered rollouts
@@ -502,7 +510,7 @@ class A2CStrategy(RLBaseStrategy):
             advantages = boostrapped_returns - values 
             policy_loss = -(advantages * log_prob).mean()
 
-            # Value Loss Term: R_t + gamma * V(S_{t+1}) - V(S_t
+            # Value Loss Term: R_t + gamma * V(S_{t+1}) - V(S_t)
             # value_loss = advantages.pow(2)
             value_loss = self.value_criterion(boostrapped_returns, values)
 

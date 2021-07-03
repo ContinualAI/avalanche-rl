@@ -87,20 +87,19 @@ class VectorizedEnvWrapper(Wrapper):
         super().__init__(env)
         self.auto_reset = auto_reset
 
-    def step(self, action: np.ndarray) -> Tuple[np.ndarray, float, bool, Dict[str, Any]]:
+    def step(self, action: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray, Dict[str, Any]]:
         obs, reward, done, info = super().step(action.item())
         info = np.asarray([info])
         reward = np.asarray([reward])
-        info[0]['actual_done'] = done
+        done = np.asarray([done])
+
         if self.auto_reset and done:
             info[0]['terminal_observation'] = obs.copy()
-            done = False
             obs = self.reset()
         if type(obs) is np.ndarray:
             obs = obs.reshape(1, *obs.shape)
         else:
             obs = np.asarray([obs])
-        done = np.asarray([done])
         
         return obs, reward, done, info
 

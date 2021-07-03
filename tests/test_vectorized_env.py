@@ -6,6 +6,7 @@ import ray
 from avalanche.training.strategies.rl_utils import Array2Tensor, RGB2GrayWrapper, BufferWrapper, CropObservationWrapper
 import torch
 
+
 def make_env(kwargs=dict()):
     return gym.make('CartPole-v1', **kwargs)
 
@@ -70,22 +71,20 @@ def test_multiple_envs_loop(n_envs: int):
 def test_auto_reset():
     env = VectorizedEnvironment(make_env, 4, auto_reset=True)
     env.reset()
-    found = False
     while True:
         actions = np.asarray([env.action_space.sample() for _ in range(4)])
-        obs, r, done, info = env.step(actions)
-        # it's never done
+        obs, _, done, info = env.step(actions)
+        # get envs which are done
         dones_idx = done.nonzero()[0]
-        assert not len(dones_idx)
         assert len(info) == 4
-        for idx in range(4):
-            if info[idx]['actual_done']:
-                assert 'terminal_observation' in info[idx]
-                assert info[idx]['terminal_observation'].shape == obs[idx].shape
-                # terminal obs different from starting one
-                assert sum(info[idx]['terminal_observation'] - obs[idx]) > 0
-                found = True
-        if found:
+
+        for idx in dones_idx:
+            assert 'terminal_observation' in info[idx]
+            assert info[idx]['terminal_observation'].shape == obs[idx].shape
+            # terminal obs different from initial one
+            assert sum(info[idx]['terminal_observation'] - obs[idx]) > 0
+
+        if done.any():
             break
 
     env.close()
@@ -100,7 +99,7 @@ def test_env_wrapping():
     env = RGB2GrayWrapper(env)
     env = CropObservationWrapper(env, resize_shape=(84, 84))
     env = BufferWrapper(env, resolution=(84, 84))
-    venv = VectorizedEnvironment(env, 2, auto_reset=False, obs_to_tensors=False)
+    venv = VectorizedEnvironment(env, 2, auto_reset=False)
     # can be wrapped like any env
     venv = Array2Tensor(venv)
 
@@ -114,4 +113,24 @@ def test_env_wrapping():
         vobs, r, dones, _ = venv.step(actions)
         obs, r, done, _ = env.step(actions[0])
         assert vobs.shape[1:] == obs.shape
-        assert type(vobs) == torch.Tensor
+        assert type(vobs) is torch.Tensor
+
+
+def test_env_different():
+    try:
+        env = gym.make('PongDeterministic-v4')
+    except Exception as e:
+        pytest.skip(
+            "Install `pip install gym[atari]` to run this test + download atari ROMs as explained here https://github.com/openai/atari-py#roms.")
+    env = VectorizedEnvironment(env, 3, auto_reset=True)
+    # init observation is always the same
+    env.reset()
+    for _ in range(10):
+        # pong actions ['NOOP', 'FIRE', 'RIGHT', 'LEFT', 'RIGHTFIRE', 'LEFTFIRE']
+        actions = np.array([0, 2, 3], dtype=np.int32).reshape(3, 1)
+        obs, _, done, info = env.step(actions)
+        for i in range(obs.shape[0]-1):
+            for j in range(i+1, obs.shape[0]):
+                assert np.sum(obs[i]-obs[j]) > 0
+
+    env.close()
