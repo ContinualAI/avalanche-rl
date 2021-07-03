@@ -3,8 +3,8 @@ import gym
 from avalanche.training.strategies.reinforcement_learning.vectorized_env import VectorizedEnvironment
 import numpy as np
 import ray
-from avalanche.training.strategies.rl_utils import RGB2GrayWrapper, BufferWrapper, CropObservationWrapper
-
+from avalanche.training.strategies.rl_utils import Array2Tensor, RGB2GrayWrapper, BufferWrapper, CropObservationWrapper
+import torch
 
 def make_env(kwargs=dict()):
     return gym.make('CartPole-v1', **kwargs)
@@ -100,7 +100,9 @@ def test_env_wrapping():
     env = RGB2GrayWrapper(env)
     env = CropObservationWrapper(env, resize_shape=(84, 84))
     env = BufferWrapper(env, resolution=(84, 84))
-    venv = VectorizedEnvironment(env, 2, auto_reset=False)
+    venv = VectorizedEnvironment(env, 2, auto_reset=False, obs_to_tensors=False)
+    # can be wrapped like any env
+    venv = Array2Tensor(venv)
 
     vobs = venv.reset()
     obs = env.reset()
@@ -112,3 +114,4 @@ def test_env_wrapping():
         vobs, r, dones, _ = venv.step(actions)
         obs, r, done, _ = env.step(actions[0])
         assert vobs.shape[1:] == obs.shape
+        assert type(vobs) == torch.Tensor

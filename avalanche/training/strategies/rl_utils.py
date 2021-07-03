@@ -3,6 +3,7 @@ import numpy as np
 import gym
 import torch
 import cv2
+from typing import Tuple, Union, Dict, Any
 
 # Env wrappers adapted from pytorch lighting bolts
 
@@ -68,12 +69,39 @@ class BufferWrapper(ObservationWrapper):
 
 class Array2Tensor(ObservationWrapper):
 
-    def __init__(self, env, add_n_envs_dim: bool=False):
+    def __init__(self, env):
         super(Array2Tensor, self).__init__(env)
-        self.add_dim = add_n_envs_dim
 
     def observation(self, observation):
         """convert observation"""
         t = torch.from_numpy(observation).float()
-        t = t.unsqueeze(0) if self.add_dim else t
         return t
+
+
+class VectorizedEnvWrapper(Wrapper):
+    """ 
+    Wraps a single environment maintaining the interface of vectorized environment 
+    with none of the overhead involved by running parallel environments.  
+    """
+    def __init__(self, env: gym.Env, auto_reset: bool = True) -> None:
+        super().__init__(env)
+        self.auto_reset = auto_reset
+
+    def step(self, action: np.ndarray) -> Tuple[np.ndarray, float, bool, Dict[str, Any]]:
+        obs, reward, done, info = super().step(action.item())
+        info = np.asarray([info])
+        reward = np.asarray([reward])
+        info[0]['actual_done'] = done
+        if self.auto_reset and done:
+            info[0]['terminal_observation'] = obs.copy()
+            done = False
+            obs = self.reset()
+        if type(obs) is np.ndarray:
+            obs = obs.reshape(1, *obs.shape)
+        else:
+            obs = np.asarray([obs])
+        done = np.asarray([done])
+        
+        return obs, reward, done, info
+
+

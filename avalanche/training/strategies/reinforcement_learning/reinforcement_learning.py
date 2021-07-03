@@ -51,8 +51,7 @@ class Step:
 
     @property
     def n_envs(self):
-        # FIXME: return self.states.shape[0] 
-        return 1
+        return self.states.shape[0] 
 
     def __getitem__(self, actor_idx: int):
         """ Slice an actor step over the n_envs dimension by returning i-th array of each attribute. """
@@ -63,12 +62,16 @@ class Step:
                      for k in self.__annotations__ if k != '_post_init')
 
     def to(self, device: torch.device):
-        return Step(
-            *
-            (
-                getattr(self, k).to(device) for k in self.__annotations__
-                if k != '_post_init'),
-            _post_init=False)
+        args = []
+        for k in self.__annotations__:
+            if k != '_post_init':
+                attr = getattr(self, k)
+                # we should only deal with arrays or tensors
+                if type(attr) is np.ndarray:
+                    attr = torch.from_numpy(attr)
+                args.append(attr.to(device))
+
+        return Step(*args, _post_init=False)
 
 
 @dataclass
@@ -228,6 +231,9 @@ class RLBaseStrategy(BaseStrategy):
 
         super().__init__(model, optimizer, criterion=criterion, device=device,
                          plugins=plugins, eval_every=eval_every)
+
+        assert rollouts_per_step > 0 or max_steps_per_rollout > 0, "Must specify at least one terminal condition for rollouts!"
+
         # if a single integer is passed, assume it's steps
         if type(per_experience_steps) is int:
             per_experience_steps = Timestep(per_experience_steps)
@@ -241,6 +247,8 @@ class RLBaseStrategy(BaseStrategy):
         # self.plugins = plugins
         # self.device = device
         self.gamma = discount_factor
+        # defined by the experience
+        self.n_envs: int = None
 
     # Additional callback added by RLBaseStrategy
     def before_rollout(self, **kwargs):
@@ -257,37 +265,68 @@ class RLBaseStrategy(BaseStrategy):
 
     def rollout(
             self, env: Env, n_rollouts: int, max_steps: int = -1) -> Tuple[List[Rollout], int]:
+        """
+        Gather experience from Environment leveraging VectorizedEnvironment for parallel interaction and 
+        handling auto reset behavior.
+        Args:
+            env (Env): [description]
+            n_rollouts (int): [description]
+            max_steps (int, optional): [description]. Defaults to -1.
+
+        Returns:
+            Tuple[List[Rollout], int]: A list of rollouts, one per episode if `n_rollouts` is defined, where an episode
+            is considered over as soon as one of the actors returns done=True. 
+            Otherwise a single rollout will be returned with the number of steps defined by `max_steps`.
+            A combination of both `n_rollouts` and `max_steps` will result in returning `n_rollouts` episodes of
+            length at most `max_steps`.
+            The number of steps performed is also always returned along with the rollouts.
+        """
         # gather experience from env
         t = 0
+        rollout_counter = 0
         rollouts = []
-        for _ in range(n_rollouts):
-            step_experiences = []
-            # reset environment only after completing episodes
-            if self._obs is None:
-                self._obs = env.reset()
-            done = False
-            # FIXME: done.any()/info actual done
-            while not done:
-                # FIXME: Remove and add vecenv
-                # sample action from policy moving observation to device
-                action = self.sample_rollout_action(
-                    self._obs.unsqueeze(0).to(self.device))
-                # FIXME: returning item for now
-                action = action.item()
-                # TODO: handle automatic reset for parallel envs with different lenght (must concatenate different episodes)
-                next_obs, reward, done, _ = env.step(action)
+        step_experiences = []
+        # reset environment on first run
+        if self._obs is None:
+            self._obs = env.reset()
 
-                step_experiences.append(
-                    Step(self._obs, action, done, reward, next_obs))
-                t += 1
-                self._obs = next_obs
-                # TODO: quit when one env is done? should be handled by vecenv as default
-                if done:
-                    self._obs = None
-                    break
-                if max_steps > 0 and t >= max_steps:
-                    break
-            rollouts.append(Rollout(step_experiences, n_envs=self.n_envs))
+        while True:
+            # sample action(s) from policy moving observation to device; actions of shape `n_envs`xA
+            action = self.sample_rollout_action(
+                self._obs.to(self.device))
+
+            # observations returned are one for each parallel environment  
+            next_obs, reward, done, info = env.step(action)
+
+            step_experiences.append(
+                Step(self._obs, action, done, reward, next_obs))
+            t += 1
+            self._obs = next_obs
+
+            # Vectorized env auto resets on done by default, check this flag to count episodes
+            # TODO: terminal_observation flag
+            if n_rollouts > 0:
+                for eid in range(self.n_envs):
+                    # if both terminal conditions are defined, 
+                    # end episode even if we performed more than `max_steps`
+                    if info[eid]['actual_done'] or (
+                            max_steps > 0 and t % max_steps == 0):
+                        rollouts.append(
+                            Rollout(step_experiences, n_envs=self.n_envs))
+                        step_experiences = []
+                        rollout_counter += 1
+                        # self._obs = None
+                        break
+
+            # check terminal condition(s)
+            if n_rollouts > 0 and rollout_counter >= n_rollouts:
+                break
+
+            if max_steps > 0 and t >= max_steps:
+                rollouts.append(
+                            Rollout(step_experiences, n_envs=self.n_envs))
+                break
+
         return rollouts, t
 
     def update(self, rollouts: List[Rollout], n_update_steps: int):
@@ -305,10 +344,14 @@ class RLBaseStrategy(BaseStrategy):
 
     def make_env(self, **kwargs):
         # TODO: can be passed as argument to specify transformations
-        # if we don't need a vectorized env,extra `n_envs` dimension is added anyway
-        if self.n_envs==1:
-            return Array2Tensor(self.environment, add_n_envs_dim=True)
-        return VectorizedEnvironment(self.environment, self.n_envs, auto_reset=True, obs_to_tensors=True)
+        # maintain vectorized env interface without parallel overhead if `n_envs` is 1
+        if self.n_envs == 1:
+            env = VectorizedEnvWrapper(self.environment, auto_reset=True)
+        else:
+            env = VectorizedEnvironment(
+                self.environment, self.n_envs, auto_reset=True)
+        # NOTE: `info['terminal_observation']`` is NOT converted to tensor 
+        return Array2Tensor(env)
 
     def train(self, experiences: Union[RLExperience, Sequence[RLExperience]],
               eval_streams: Optional[Sequence[Union[RLExperience,
@@ -436,7 +479,6 @@ class A2CStrategy(RLBaseStrategy):
 
     def update(self, rollouts: List[Rollout], n_update_steps: int):
         # perform gradient step(s) over batch of gathered rollouts
-        # TODO: rollout buffer to avoid loop
         self.loss = 0.
         for rollout in rollouts:
             # move samples to device for processing

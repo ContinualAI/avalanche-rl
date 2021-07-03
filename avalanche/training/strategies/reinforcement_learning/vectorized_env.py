@@ -4,10 +4,9 @@ from typing import Callable, List, Union, Dict, Any
 import numpy as np
 import multiprocessing
 import types
-import torch
+
 # ref https://docs.ray.io/en/master/actors.html#creating-an-actor
 # https://stable-baselines3.readthedocs.io/en/master/guide/vec_envs.html
-
 
 @ray.remote
 class Actor:
@@ -62,17 +61,17 @@ class Actor:
 
 
 class VectorizedEnvironment(object):
-    """Only supports numpy array to avoid facilitate object passing in distributed setting.
+    """
+    Vectorized Environment inspired by https://stable-baselines3.readthedocs.io/en/master/guide/vec_envs.html,
+    realized using `ray` as backend for multi-agent parallel environment interaction.
+    Only supports numpy array to avoid facilitate object passing in distributed setting.
 
-    Args:
-        object ([type]): [description]
     """
 
     def __init__(
             self, envs: Union[Callable[[Dict[Any, Any]], gym.Env], List[gym.Env], gym.Env],
             n_envs: int, env_kwargs=dict(), auto_reset: bool = True,
-            ray_kwargs={'num_cpus': multiprocessing.cpu_count()},
-            obs_to_tensors: bool = True
+            ray_kwargs={'num_cpus': multiprocessing.cpu_count()}
             ) -> None:
         # Avoid passing over potentially big objects on the net, prefer creating 
         # env locally to each actor
@@ -97,8 +96,6 @@ class VectorizedEnvironment(object):
                            i, env_kwargs, auto_reset=auto_reset)
                        for i in range(n_envs)]
 
-        self.to_tensor = obs_to_tensors
-
     def _remote_vec_calls(self, fname: str, *args, **kwargs) -> Union[np.ndarray, List[Any]]:
         promises = [getattr(actor, fname).remote(*args, **kwargs)
                     for actor in self.actors]
@@ -122,10 +119,6 @@ class VectorizedEnvironment(object):
                 step_results[i].append(actor_res[i])
 
         actor_steps = list(map(np.asarray, step_results))
-
-        # terminal obs is NOT converted to tensor 
-        if self.to_tensor:
-            actor_steps[0] = torch.from_numpy(actor_steps[0])
 
         return actor_steps
 

@@ -14,7 +14,8 @@ def get_all_envs_id():
 def gym_benchmark_generator(
         env_names: List[str] = [],
         environments: List[gym.Env] = [],
-        n_envs: int = None, env_kwargs: Dict[str, Dict[Any, Any]] = {},
+        n_random_envs: int = None, env_kwargs: Dict[str, Dict[Any, Any]] = {},
+        n_parallel_envs: int = 1,
         n_experiences=None,
         envs_ids_to_sample_from: List[str] = None, *args, **kwargs) -> RLScenario:
     # three ways to create environments from gym
@@ -23,15 +24,15 @@ def gym_benchmark_generator(
                  for ename in env_names]
     elif environments is not None and len(environments):
         envs_ = environments
-    elif n_envs is not None and n_envs > 0:
+    elif n_random_envs is not None and n_random_envs > 0:
         # choose `n_envs` random envs either from the registered ones or from the provided ones
         to_choose = get_all_envs_id(
         ) if envs_ids_to_sample_from is not None else envs_ids_to_sample_from
-        ids = np.random.choice(to_choose, n_envs)  
+        ids = np.random.choice(to_choose, n_random_envs)  
         envs_ = [gym.make(ename, **env_kwargs.get(ename, {})) for ename in ids]
     else:
         raise ValueError(
-            'You must provide at least one argument among `env_names`,`environments`, `n_envs`!')
+            'You must provide at least one argument among `env_names`,`environments`, `n_random_envs`!')
 
     # envs will be cycled through if n_experiences > len(envs_) otherwise only the first n will be used
     n_experiences = n_experiences if n_experiences is not None else len(envs_)         
@@ -40,7 +41,7 @@ def gym_benchmark_generator(
     #     assert len(per_experience_episodes) == n_experiences
 
     return RLScenario(
-        envs=envs_, n_experiences=n_experiences, *args, **kwargs)
+        envs=envs_, n_experiences=n_experiences, n_parallel_envs=n_parallel_envs, *args, **kwargs)
 
 
 def atari_benchmark_generator() -> RLScenario:

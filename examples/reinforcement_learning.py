@@ -37,7 +37,7 @@ if __name__ == "__main__":
     device = torch.device('cuda:0')
     # TODO: benchmark should make Env parallel?
     # ['CartPole-v0', 'CartPole-v1'..]
-    scenario = gym_benchmark_generator(['CartPole-v1'])
+    scenario = gym_benchmark_generator(['CartPole-v1'], n_parallel_envs=1)
 
     # CartPole setting
     model = ActorCriticMLP(4, 2, 128)
@@ -45,8 +45,8 @@ if __name__ == "__main__":
                     #   n_actions=2, hidden_layers=2)
     # cl_strategy = Naive(model, optim, )
     # strategy = RLStrategy('MlpPolicy', [scenario.envs[0]], 'dqn', None, per_experience_episodes=3, eval_mb_size=1, device=device, )
-
     optimizer = Adam(model.parameters(), lr=1e-4)
+    # FIXME: it broke somewhere
     strategy = A2CStrategy(
     model, optimizer, per_experience_steps=10000, max_steps_per_rollout=1,
     device=device)

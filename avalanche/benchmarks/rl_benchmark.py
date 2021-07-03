@@ -8,8 +8,8 @@ import random
 def rl_experience_factory(
         stream: GenericScenarioStream, exp_idx:
         Union[int, slice, Iterable[int]]) -> 'RLExperience':
-    # simple things first
-    return RLExperience(stream, exp_idx, stream.scenario.envs[exp_idx])
+    # supports even a different number of parallel envs per experience 
+    return RLExperience(stream, exp_idx, stream.scenario.envs[exp_idx], stream.scenario.n_envs[exp_idx])
 
 
 # NCScenario equivalent (which subclasses GenericCLScenario)
@@ -17,6 +17,7 @@ class RLScenario(GenericCLScenario['RLExperience']):
 
     def __init__(self, envs: List[Env],
                  n_experiences: int,
+                 n_parallel_envs: Union[int, List[int]],
                  task_labels: bool=True,
                  shuffle: bool = False, 
                  seed: Optional[int] = None,
@@ -26,7 +27,11 @@ class RLScenario(GenericCLScenario['RLExperience']):
                  reproducibility_data: Optional[Dict[str, Any]] = None):
 
         assert n_experiences > 0, "Number of experiences must be a positive integer"
+        if type(n_parallel_envs) is int:
+            n_parallel_envs = [n_parallel_envs] * n_experiences
+        assert all([n>0 for n in n_parallel_envs]), "Number of parallel environments must be a positive integer"
         self.envs = envs
+        self.n_envs = n_parallel_envs
         if n_experiences < len(self.envs):
             self.envs = self.envs[:n_experiences]
         elif n_experiences > len(self.envs):
@@ -165,7 +170,7 @@ class RLExperience(GenericExperience[RLScenario,
     def __init__(self,
                  origin_stream: GenericScenarioStream[
                      'RLExperience', RLScenario],
-                 current_experience: int, env: Env):
+                 current_experience: int, env: Env, n_envs: int):
         """
         Creates a ``NCExperience`` instance given the stream from this
         experience was taken and and the current experience ID.
@@ -176,16 +181,12 @@ class RLExperience(GenericExperience[RLScenario,
         """
         super(RLExperience, self).__init__(origin_stream, current_experience)
         self.env = env
+        self.n_envs = n_envs
 
     @property
     def environment(self) -> Env:
         return self.env
     
-    #FIXME: implement or make env return vectorizedenv with n inside
-    @property
-    def n_envs(self) -> Env:
-        return 1
-
     # FIXME: can't be None
     @property
     def task_labels(self) -> List[int]:
