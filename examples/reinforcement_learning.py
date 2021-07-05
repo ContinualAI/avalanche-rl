@@ -35,7 +35,7 @@ def evaluate(model: torch.nn.Module, n_episodes=10, device=torch.device('cpu')):
 
 if __name__ == "__main__":
     device = torch.device('cuda:0')
-    # TODO: benchmark should make Env parallel?
+    
     # ['CartPole-v0', 'CartPole-v1'..]
     scenario = gym_benchmark_generator(['CartPole-v1'], n_parallel_envs=2)
 
@@ -46,7 +46,7 @@ if __name__ == "__main__":
     # cl_strategy = Naive(model, optim, )
     # strategy = RLStrategy('MlpPolicy', [scenario.envs[0]], 'dqn', None, per_experience_episodes=3, eval_mb_size=1, device=device, )
     optimizer = Adam(model.parameters(), lr=1e-4)
-    # FIXME: it broke somewhere, check if auto_reset with n_env=1 is responsible 
+    
     strategy = A2CStrategy(
         model, optimizer, per_experience_steps=10000, max_steps_per_rollout=1,
         device=device)

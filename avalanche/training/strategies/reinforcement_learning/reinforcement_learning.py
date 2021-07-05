@@ -79,78 +79,138 @@ class Rollout:
     steps: List[Step]
     n_envs: int
     _device: torch.device = torch.device('cpu')
+    _unraveled: bool = False
 
-    def _get_scalar(self, attr: str, type_: str):
+    # FIXME: put this to work and test it (delete redudant methods too)
+    def _pre_compute_unraveled_steps(self):
+        """Computes and stores values for `obs`, `rewards`, `dones`, `next_obs` unraveled
+           through time (e.g. of shape `n_env` x `len(steps)` x D).
+           This is only done during the update of the network (when needed) 
+           to save memory specifically in the case of ReplayMemory, which would end
+           up containing millions of steps.
+        """
+        if not len(self.steps):
+            return False
+        for attr in ['states', 'actions', 'rewards', 'dones', 'next_states']:
+            attr_shape = getattr(self.steps[0], attr).shape
+            attr_type = getattr(self.steps[0], attr).dtype
+            attr_type = attr_type if type(
+                attr_type) is torch.dtype else getattr(torch, str(attr_type))
+            print("Cache:", attr_shape, attr_type)
+            # step dimension first for loop efficiency
+            attr_tensor = torch.zeros(
+                len(self.steps),
+                *attr_shape, dtype=attr_type)
+            setattr(self, '_'+attr, attr_tensor)
+
+        # loop through step and add each attribute
+        for i, step in enumerate(self.steps):
+            for attr in step.__annotations__:
+                if attr != '_post_init':
+                    # e.g. actions[step_no] = step.actions
+                    step_value = getattr(step, attr)
+                    # cast to torch
+                    sv = torch.from_numpy(step_value) if type(
+                        step_value) is np.ndarray else step_value    
+                    getattr(self, '_'+attr)[i] = sv
+
+        # swap attr axes to get desidered shape `n_env` x `len(steps)` x D 
+        # if `n_env` is specified
+        if self.n_envs > 0:
+            for attr in [
+                    'states', 'actions', 'rewards', 'dones', 'next_states']:
+                attr_tensor = getattr(self, '_'+attr)
+                setattr(self, '_'+attr, torch.transpose(attr_tensor, 1, 0))
+        return True
+
+    def _get_value(self, attr: str):
         if not len(self.steps):
             return []
-        # batch dimension over number of parallel environments, instatiate transpose for faster assignment
-        mlib = torch if type(
-            getattr(self.steps[0], attr)) is torch.Tensor else np
-        # check whether we need to add n_envs dimension
-        shape = (
-            len(self.steps),
-            self.n_envs) if self.n_envs > 0 else(
-            len(self.steps),)
+        # pre-compute un-raveled steps before accessing one attribute 
+        if not self._unraveled:
+            self._unraveled = self._pre_compute_unraveled_steps()
 
-        values = mlib.zeros(
-            shape,
-            dtype=getattr(mlib, type_)).to(self._device)
-        # FIXME: should only loop ONCE through all steps and retrieve all values (rewards/dones..) (cache) 
-        for i, step in enumerate(self.steps):
-            values[i] = getattr(step, attr)
-        return values.T
+        return getattr(self, '_'+attr)
+
+        # batch dimension over number of parallel environments, instatiate transpose for faster assignment
+        # mlib = torch if type(
+        #     getattr(self.steps[0], attr)) is torch.Tensor else np
+        # # check whether we need to add n_envs dimension
+        # shape = (
+        #     len(self.steps),
+        #     self.n_envs) if self.n_envs > 0 else(
+        #     len(self.steps),)
+
+        # values = mlib.zeros(
+        #     shape,
+        #     dtype=getattr(mlib, type_)).to(self._device)
+
+        # for i, step in enumerate(self.steps):
+        #     values[i] = getattr(step, attr)
+        # return values.T
 
     @property
     def rewards(self):
         """
             Returns all rewards gathered at each step of this rollout.
         """
-        return self._get_scalar('rewards', 'float32')
+        return self._get_value('rewards')
 
     @property
     def dones(self):
         """
             Returns terminal state flag of each step of this rollout.
         """
-        return self._get_scalar('dones', 'bool')
+        # return self._get_scalar('dones', 'bool')
+        return self._get_value('dones')
 
     @property
     def actions(self):
         """
             Returns all actions taken at each step of this rollout.
         """
-        return self._get_scalar('actions', 'int64')
+        # return self._get_scalar('actions', 'int64')
+        return self._get_value('actions')
 
     def _get_obs(self, prop_name: str, as_tensor=True):
-        """
-            Returns all observations gathered at each step of this rollout.
-        """
+
         if not len(self.steps):
             return []
-        mlib = torch if as_tensor else np
-        obs = mlib.zeros(
-            (len(self.steps), *self.steps[0].states.shape),
-            dtype=mlib.float32).to(self._device)
-        for i, step in enumerate(self.steps):
-            obs[i] = getattr(step, prop_name)
+        return getattr(self, '_'+prop_name)
+        # mlib = torch if as_tensor else np
+        # obs = mlib.zeros(
+        #     (len(self.steps), *self.steps[0].states.shape),
+        #     dtype=mlib.float32).to(self._device)
+        # for i, step in enumerate(self.steps):
+        #     obs[i] = getattr(step, prop_name)
 
-        # batch dimension over number of parallel environments
-        return mlib.swapaxes(obs, 0, 1)
+        # # batch dimension over number of parallel environments
+        # return mlib.swapaxes(obs, 0, 1)
 
     @property
     def observations(self):
-        return self._get_obs('states')
+        """
+            Returns all observations gathered at each step of this rollout.
+        """
+        return self._get_value('states')
 
     @property
     def next_observations(self):
-        return self._get_obs('next_states')
+        """
+            Returns all 'next step' observations gathered at each step of this rollout.
+        """
+        return self._get_value('next_states')
 
     def to(self, device: torch.device):
         """
             Should only do this before processing to avoid filling gpu with replay memory.
         """
-        return Rollout([step.to(device) for step in self.steps],
-                       n_envs=self.n_envs, _device=device)
+        if not self._unraveled:
+            self._unraveled = self._pre_compute_unraveled_steps()
+        for attr in ['states', 'actions', 'rewards', 'dones', 'next_states']:
+            attr_tensor = getattr(self, '_'+attr)
+            setattr(self, '_'+attr, attr_tensor.to(device))
+        return self
 
     def __len__(self):
         return len(self.steps)
@@ -162,13 +222,23 @@ class ReplayMemory:
     """ Max number of Steps contained inside memory. When trying to add a new Step and size is reached, a previous Step is replaced. """
     size: int
     n_envs: int
-    steps_counter: int = 0
     _memory: List[Step] = field(default_factory=lambda: [])
 
+    def __post_init__(self):
+        self.steps_counter: int = len(self._memory)
+
     def _unravel_step(self, step: Step):
-        for actor_no in range(step.n_envs):
-            # avoid adding n_env dimension
-            yield Step(*step[actor_no], _post_init=False)
+        """
+            Slice through provided step on `n_envs` dimension returning `n_envs`
+            separated Steps. 
+        """
+        # support even envs not using VectorizedEnv interface
+        if self.n_envs < 0:
+            yield step
+        else:
+            for actor_no in range(step.n_envs):
+                # avoid adding n_env dimension
+                yield Step(*step[actor_no], _post_init=False)
 
     def add_rollouts(self, rollouts: List[Rollout]):
         """
@@ -193,7 +263,7 @@ class ReplayMemory:
     def sample_batch(self, batch_dim: int, device: torch.device) -> Rollout:
         """
             Sample a batch of random Steps, returned as a Rollout with time independent Steps
-            and no n_envs dimension unsqueezing. 
+            and no `n_envs` dimension (therefore of shape `batch_dim` x D). 
             Batch is also moved to device just before processing so that we don't risk
             filling GPU with replay memory samples.
 
@@ -203,9 +273,18 @@ class ReplayMemory:
         Returns:
             [type]: [description]
         """
-        return Rollout([s.to(device) for s in np.random.choice(
+        if batch_dim > len(self._memory):
+            raise Exception("Sample dimension exceed current memory size")
+        # return Rollout([s.to(device) for s in np.random.choice(
+        #                    self._memory, size=batch_dim,
+        #                 replace=False)], n_envs=-1)
+        return Rollout(np.random.choice(
                            self._memory, size=batch_dim,
-                        replace=False)], n_envs=-1)
+                        replace=False).tolist(),
+                       n_envs=-1).to(device)
+
+    def __len__(self):
+        return len(self._memory)
 
 
 class TimestepUnit(enum.IntEnum):
@@ -261,7 +340,7 @@ class RLBaseStrategy(BaseStrategy):
         for p in self.plugins:
             p.after_rollout(self, **kwargs)
 
-    def sample_rollout_action(self, observations: torch.Tensor)->np.ndarray:
+    def sample_rollout_action(self, observations: torch.Tensor) -> np.ndarray:
         """Implements the action sampling a~Pi(s) where Pi is the parameterized
            function we're trying to learn.
            Output of this function should be a numpy array to comply with 
