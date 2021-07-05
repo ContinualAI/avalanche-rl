@@ -1,5 +1,5 @@
 from avalanche.training.strategies.reinforcement_learning import A2CStrategy, RLBaseStrategy, DQNStrategy
-from avalanche.training.strategies.rl_utils import Array2Tensor
+from avalanche.training.strategies.reinforcement_learning.utils import Array2Tensor
 from avalanche.models.actor_critic import ActorCriticMLP
 from avalanche.models.dqn import ConvDeepQN, MLPDeepQN
 from avalanche.benchmarks.scenarios.generic_definitions import Experience
@@ -20,6 +20,7 @@ def evaluate(model: torch.nn.Module, n_episodes=10, device=torch.device('cpu')):
     env = gym.make('CartPole-v1')
     env = Array2Tensor(env)
     rewards, lengths = [], []
+    model = model.to(device)
     for ep in range(n_episodes):
         obs = env.reset()
         done = False
@@ -34,10 +35,13 @@ def evaluate(model: torch.nn.Module, n_episodes=10, device=torch.device('cpu')):
 
 
 if __name__ == "__main__":
+    # device = torch.device('cpu')
     device = torch.device('cuda:0')
 
     # ['CartPole-v0', 'CartPole-v1'..]
-    scenario = gym_benchmark_generator(['CartPole-v1'], n_parallel_envs=1)
+    scenario = gym_benchmark_generator(['CartPole-v1'], n_parallel_envs=2)
+    # scenario = gym_benchmark_generator(['MountainCar-v0'], n_parallel_envs=1)
+
 
     # CartPole setting
     model = ActorCriticMLP(4, 2, 128)
@@ -51,8 +55,8 @@ if __name__ == "__main__":
         model, optimizer, per_experience_steps=10000, max_steps_per_rollout=1,
         device=device)
     # strategy = DQNStrategy(
-    # model, optimizer, 100, batch_size=32, exploration_fraction=.2, rollouts_per_step=100,
-    # replay_memory_size=1000, updates_per_step=2, replay_memory_init_size=500, double_dqn=False,
+    # model, optimizer, 1000, batch_size=32, exploration_fraction=.2, rollouts_per_step=10,
+    # replay_memory_size=10000, updates_per_step=10, replay_memory_init_size=500, double_dqn=True,
     # target_net_update_interval=10, polyak_update_tau=1.)
 
     # TRAINING LOOP

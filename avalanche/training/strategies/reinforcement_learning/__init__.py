@@ -1,2 +1,4 @@
 from .vectorized_env import VectorizedEnvironment
-from .reinforcement_learning import RLBaseStrategy, DQNStrategy, A2CStrategy
+from .rl_base_strategy import RLBaseStrategy
+from .dqn import DQNStrategy
+from .actor_critic import A2CStrategy

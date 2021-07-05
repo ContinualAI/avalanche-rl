@@ -128,6 +128,8 @@ class VectorizedEnvironment(object):
                 step_results[i].append(actor_res[i])
 
         actor_steps = list(map(np.asarray, step_results))
+        # rewards as float instead of double
+        actor_steps[1] = actor_steps[1].astype(np.float32)
 
         return actor_steps
 
