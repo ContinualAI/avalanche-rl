@@ -35,9 +35,9 @@ def evaluate(model: torch.nn.Module, n_episodes=10, device=torch.device('cpu')):
 
 if __name__ == "__main__":
     device = torch.device('cuda:0')
-    
+
     # ['CartPole-v0', 'CartPole-v1'..]
-    scenario = gym_benchmark_generator(['CartPole-v1'], n_parallel_envs=2)
+    scenario = gym_benchmark_generator(['CartPole-v1'], n_parallel_envs=1)
 
     # CartPole setting
     model = ActorCriticMLP(4, 2, 128)

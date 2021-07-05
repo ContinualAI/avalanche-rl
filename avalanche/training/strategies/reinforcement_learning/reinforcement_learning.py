@@ -96,7 +96,7 @@ class Rollout:
             attr_type = getattr(self.steps[0], attr).dtype
             attr_type = attr_type if type(
                 attr_type) is torch.dtype else getattr(torch, str(attr_type))
-            print("Cache:", attr_shape, attr_type)
+            # print("Cache:", attr_shape, attr_type)
             # step dimension first for loop efficiency
             attr_tensor = torch.zeros(
                 len(self.steps),
@@ -120,6 +120,7 @@ class Rollout:
             for attr in [
                     'states', 'actions', 'rewards', 'dones', 'next_states']:
                 attr_tensor = getattr(self, '_'+attr)
+                # print(attr, 'tensor shape', attr_tensor.shape, attr_tensor.dtype)
                 setattr(self, '_'+attr, torch.transpose(attr_tensor, 1, 0))
         return True
 

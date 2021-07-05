@@ -87,19 +87,29 @@ class VectorizedEnvWrapper(Wrapper):
         super().__init__(env)
         self.auto_reset = auto_reset
 
+    def _unsqueeze_obs(self, obs):
+        if obs.shape == self.observation_space.shape:
+            if type(obs) is np.ndarray:
+                obs = obs.reshape(1, *obs.shape)
+            else:
+                obs = np.asarray([obs])
+        return obs
+
     def step(self, action: np.ndarray) -> Tuple[np.ndarray, np.ndarray, np.ndarray, Dict[str, Any]]:
         obs, reward, done, info = super().step(action.item())
         info = np.asarray([info])
-        reward = np.asarray([reward])
+        reward = np.asarray([reward], dtype=np.float32)
         done = np.asarray([done])
 
+        # terminal observation not reshaped
         if self.auto_reset and done:
             info[0]['terminal_observation'] = obs.copy()
             obs = self.reset()
-        if type(obs) is np.ndarray:
-            obs = obs.reshape(1, *obs.shape)
-        else:
-            obs = np.asarray([obs])
+
+        obs = self._unsqueeze_obs(obs)
         
         return obs, reward, done, info
 
+    def reset(self) -> Any:
+        obs = super().reset()
+        return self._unsqueeze_obs(obs)
