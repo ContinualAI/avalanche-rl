@@ -18,7 +18,6 @@ TGenericScenarioStream = TypeVar('TGenericScenarioStream',
                                  bound='GenericScenarioStream')
 
 ####
-# gym as core-dependency..?
 from gym import Env
 RLStreamDataOrigin = Union[Env, Sequence[Env]]
 TStreamDataOrigin = Union[AvalancheDataset, Sequence[AvalancheDataset],

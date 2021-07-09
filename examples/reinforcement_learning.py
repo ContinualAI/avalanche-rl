@@ -12,6 +12,7 @@ import torch
 import gym
 from torch.distributions import Categorical
 import numpy as np
+from avalanche.training import default_rl_logger
 
 
 def evaluate(model: torch.nn.Module, n_episodes=10, device=torch.device('cpu')):
@@ -39,7 +40,7 @@ if __name__ == "__main__":
     device = torch.device('cuda:0')
 
     # ['CartPole-v0', 'CartPole-v1'..]
-    scenario = gym_benchmark_generator(['CartPole-v1'], n_parallel_envs=2)
+    scenario = gym_benchmark_generator(['CartPole-v1'], n_parallel_envs=1, eval_envs=['CartPole-v0'])
     # scenario = gym_benchmark_generator(['MountainCar-v0'], n_parallel_envs=1)
 
 
@@ -52,8 +53,8 @@ if __name__ == "__main__":
     optimizer = Adam(model.parameters(), lr=1e-4)
     
     strategy = A2CStrategy(
-        model, optimizer, per_experience_steps=10000, max_steps_per_rollout=1,
-        device=device)
+        model, optimizer, per_experience_steps=100, max_steps_per_rollout=1,
+        device=device, eval_every=10, eval_episodes=100)
     # strategy = DQNStrategy(
     # model, optimizer, 1000, batch_size=32, exploration_fraction=.2, rollouts_per_step=10,
     # replay_memory_size=10000, updates_per_step=10, replay_memory_init_size=500, double_dqn=True,
@@ -65,9 +66,10 @@ if __name__ == "__main__":
     for experience in scenario.train_stream:
         print("Start of experience ", experience.current_experience)
         print("Current Env ", experience.env)
-        strategy.train(experience)
+        strategy.train(experience, scenario.test_stream)
         print('Training completed')
 
+        print("Test stream", [e.environment for e in scenario.test_stream])
         # print('Computing accuracy on the whole test set')
         # results.append(cl_strategy.eval(scenario.test_stream))
 

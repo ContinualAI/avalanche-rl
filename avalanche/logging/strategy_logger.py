@@ -168,6 +168,11 @@ class StrategyLogger(StrategyCallbacks[None], ABC):
         for val in metric_values:
             self.log_metric(val, 'after_eval_iteration')
 
+    def after_rollout(self, strategy: 'BaseStrategy',
+                             metric_values: List['MetricValue'], **kwargs):
+        for val in metric_values:
+            self.log_metric(val, 'after_rollout')
+
 
 __all__ = [
     'StrategyLogger'

@@ -18,7 +18,8 @@ class A2CStrategy(RLBaseStrategy):
             discount_factor: float = 0.99, device='cpu',
             updates_per_step: int = 1,
             plugins: Optional[Sequence[StrategyPlugin]] = [],
-            eval_every=-1, policy_loss_weight: float = 0.5,
+            eval_every:int=-1, eval_episodes:int=1, 
+            policy_loss_weight: float = 0.5,
             value_loss_weight: float = 0.5,):
         super().__init__(
             model, optimizer, per_experience_steps=per_experience_steps,
@@ -26,7 +27,7 @@ class A2CStrategy(RLBaseStrategy):
             rollouts_per_step=-1,
             max_steps_per_rollout=max_steps_per_rollout,
             updates_per_step=updates_per_step, device=device, plugins=plugins,
-            discount_factor=discount_factor, eval_every=eval_every)
+            discount_factor=discount_factor, eval_every=eval_every, eval_episodes=eval_episodes)
         assert self.per_experience_steps.unit == TimestepUnit.STEPS, 'A2C only supports expressing training duration in steps not episodes'
 
         # TODO: 'dataloader' calls with pre-processing env wrappers 

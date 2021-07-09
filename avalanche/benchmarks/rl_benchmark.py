@@ -1,15 +1,19 @@
 from avalanche.benchmarks.scenarios.generic_definitions import Experience
 from avalanche.benchmarks.scenarios.generic_cl_scenario import TGenericScenarioStream, GenericScenarioStream, TGenericCLScenario, Iterable, GenericCLScenario, GenericExperience
 from gym.core import Env
-from typing import Dict, Union, Optional, Sequence, Any, List
+from typing import Callable, Dict, Union, Optional, Sequence, Any, List
 import random
 
 
 def rl_experience_factory(
         stream: GenericScenarioStream, exp_idx:
         Union[int, slice, Iterable[int]]) -> 'RLExperience':
-    # supports even a different number of parallel envs per experience 
-    return RLExperience(stream, exp_idx, stream.scenario.envs[exp_idx], stream.scenario.n_envs[exp_idx])
+    if stream.name ==  'train':
+        # supports even a different number of parallel envs per experience 
+        return RLExperience(stream, exp_idx, stream.scenario.envs[exp_idx], stream.scenario.n_envs[exp_idx])
+    elif stream.name ==  'test':
+        # only support single env
+        return RLExperience(stream, exp_idx, stream.scenario.eval_envs[exp_idx], 1)
 
 
 # NCScenario equivalent (which subclasses GenericCLScenario)
@@ -18,6 +22,7 @@ class RLScenario(GenericCLScenario['RLExperience']):
     def __init__(self, envs: List[Env],
                  n_experiences: int,
                  n_parallel_envs: Union[int, List[int]],
+                 eval_envs: Union[List[Env], List[Callable[[], Env]]],
                  task_labels: bool=True,
                  shuffle: bool = False, 
                  seed: Optional[int] = None,
@@ -38,15 +43,17 @@ class RLScenario(GenericCLScenario['RLExperience']):
             # cycle through envs sequentially
             for i in range(n_experiences - len(self.envs)):
                 self.envs.append(self.envs[i % len(self.envs)])
-
+        
         if shuffle:
             perm = random.shuffle(list(range(len(self.envs))))
             self.envs = [self.envs[i] for i in perm]
         
+        self.eval_envs = eval_envs
+
         # ignore labels for now
         stream_definitions = {
             'train': (self.envs, 0, None),
-            'test': (self.envs, 0, None)
+            'test': (self.eval_envs, 0, None)
         }
         super().__init__(stream_definitions=stream_definitions,
                          complete_test_set_only=False,
@@ -170,7 +177,7 @@ class RLExperience(GenericExperience[RLScenario,
     def __init__(self,
                  origin_stream: GenericScenarioStream[
                      'RLExperience', RLScenario],
-                 current_experience: int, env: Env, n_envs: int):
+                 current_experience: int, env: Union[Env, Callable[[], Env]], n_envs: int):
         """
         Creates a ``NCExperience`` instance given the stream from this
         experience was taken and and the current experience ID.
@@ -185,6 +192,10 @@ class RLExperience(GenericExperience[RLScenario,
 
     @property
     def environment(self) -> Env:
+        # supports dynamic creation of environment, useful to instantiate envs for evaluation
+        if not isinstance(self.env, Env):
+            # assume it's callable
+            return self.env()
         return self.env
     
     # FIXME: can't be None

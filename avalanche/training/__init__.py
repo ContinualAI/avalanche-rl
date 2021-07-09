@@ -6,7 +6,9 @@ CL strategies. These are provided either as standalone strategies in
 can be easily combined with your own strategy.
 """
 from avalanche.evaluation.metrics import accuracy_metrics, loss_metrics
+from avalanche.evaluation.metrics.reward import *
 from avalanche.logging import InteractiveLogger
+from avalanche.logging.interactive_logging import TqdmWriteInteractiveLogger
 from .plugins import EvaluationPlugin
 
 
@@ -14,3 +16,7 @@ default_logger = EvaluationPlugin(
     accuracy_metrics(minibatch=False, epoch=True, experience=True, stream=True),
     loss_metrics(minibatch=False, epoch=True, experience=True, stream=True),
     loggers=[InteractiveLogger()])
+
+default_rl_logger = EvaluationPlugin(
+                                     RewardPluginMetric(window_size=1000),
+                                     loggers=[TqdmWriteInteractiveLogger(log_every=10)])

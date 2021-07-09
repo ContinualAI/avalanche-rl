@@ -80,6 +80,7 @@ class PluginMetric(Metric[TResult], StrategyCallbacks['MetricResult'], ABC):
     reset and emit metric results at appropriate times
     (during specific callbacks).
     """
+
     def __init__(self):
         """
         Creates an instance of a plugin metric.
@@ -196,6 +197,10 @@ class PluginMetric(Metric[TResult], StrategyCallbacks['MetricResult'], ABC):
             -> 'MetricResult':
         pass
 
+    def after_rollout(self, strategy: 'BaseStrategy') \
+            -> 'MetricResult':
+        pass
+
     def after_eval_iteration(self, strategy: 'BaseStrategy') \
             -> 'MetricResult':
         self.global_it_counter += 1
@@ -207,6 +212,7 @@ class GenericPluginMetric(PluginMetric[TResult]):
     The user can subclass this class to easily implement custom plugin
     metrics.
     """
+
     def __init__(self, metric, reset_at='experience', emit_at='experience',
                  mode='eval'):
         super(GenericPluginMetric, self).__init__()

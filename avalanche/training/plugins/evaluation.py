@@ -209,3 +209,6 @@ class EvaluationPlugin(StrategyPlugin):
 
     def after_eval_iteration(self, strategy: 'BaseStrategy', **kwargs):
         self._update_metrics(strategy, 'after_eval_iteration')
+
+    def after_rollout(self, strategy: 'BaseStrategy', **kwargs):
+        self._update_metrics(strategy, 'after_rollout')
