@@ -123,14 +123,14 @@ class TqdmWriteInteractiveLogger(InteractiveLogger):
         self._progress.update()
         self._progress.refresh()
         super().after_update(strategy, metric_values, **kwargs)
-        self.step_counter += 1
-        if self.log_every % self.step_counter == 0:
+        if self.step_counter % self.log_every == 0:
             self.print_current_metrics()
             self.metric_vals = {}
+        self.step_counter += 1
 
     def before_eval(self, strategy: 'BaseStrategy', metric_values: List['MetricValue'], **kwargs):
         self.metric_vals = {}
-        tqdm.write('-- >> Start of eval phase << --', file=self.file)
+        tqdm.write('\n-- >> Start of eval phase << --', file=self.file)
         
 
     def before_eval_exp(self, strategy: 'BaseStrategy',
@@ -155,21 +155,15 @@ class TqdmWriteInteractiveLogger(InteractiveLogger):
               file=self.file)
 
     def after_eval(self, strategy: 'BaseStrategy', metric_values: List['MetricValue'], **kwargs):
-        tqdm.write('-- >> End of eval phase << --\n\n', file=self.file)
-        self.print_current_metrics()
+        tqdm.write('-- >> End of eval phase << --\n', file=self.file)
+        # self.print_current_metrics()
         self.metric_vals = {}
 
     def before_training(self, strategy: 'BaseStrategy',
                         metric_values: List['MetricValue'], **kwargs):
-        tqdm.write('\n\n-- >> Start of training phase << --', file=self.file)
+        tqdm.write('-- >> Start of training phase << --', file=self.file)
 
 
     def after_training(self, strategy: 'BaseStrategy',
                        metric_values: List['MetricValue'], **kwargs):
         tqdm.write('-- >> End of training phase << --', file=self.file)
-
-    def after_eval(self, strategy: 'BaseStrategy',
-                   metric_values: List['MetricValue'], **kwargs):
-        tqdm.write('-- >> End of eval phase << --', file=self.file)
-        self.print_current_metrics()
-        self.metric_vals = {}
