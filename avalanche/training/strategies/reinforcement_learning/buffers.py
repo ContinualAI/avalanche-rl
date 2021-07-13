@@ -3,6 +3,7 @@ from typing import Union, List
 from dataclasses import dataclass, field
 import numpy as np
 
+
 @dataclass
 class Step:
     """ Holds vectorized environment steps result of size `n_envs` x D. """
@@ -64,14 +65,17 @@ class Rollout:
     n_envs: int
     _device: torch.device = torch.device('cpu')
     _unraveled: bool = False
+    """ Whether to shuffle steps contained in this rollout. """
+    _shuffle: bool = True
+    """ Whether to flatten time dimension returning `n_envs`*`len(steps)`xD tensors. """
+    _flatten_time: bool = True
 
     def _pre_compute_unraveled_steps(self):
         """Computes and stores values for `obs`, `rewards`, `dones`, `next_obs` unraveled
-           through time (e.g. of shape `n_env` x `len(steps)` x D), unless a single step 
-           is present, in that case the time dimension is 'squeezed'.
-           This is only done during the update of the network (when needed) 
-           to save memory specifically in the case of ReplayMemory, which would end
-           up containing millions of steps.
+           (e.g. of shape `n_env` x `len(steps)` x D) or flattened 
+           (e.g. of shape `n_env` * `len(steps)` x D) through time .
+           This is only done during the update of the policy network (when needed) 
+           to save memory specifically for the case of ReplayMemory.
         """
         if not len(self.steps):
             return False
@@ -99,19 +103,27 @@ class Rollout:
                         step_value) is np.ndarray else step_value    
                     getattr(self, '_'+attr)[i] = sv
 
-        # swap attr axes to get desidered shape `n_env` x `len(steps)` x D 
-        # if `n_env` is specified
+        # swap attr axes to get desidered shape unravelled or flattened shape
         if self.n_envs > 0:
             for attr in [
                     'states', 'actions', 'rewards', 'dones', 'next_states']:
                 attr_tensor = getattr(self, '_'+attr)
+                if self._flatten_time:
+                    # `n_env` *`len(steps)` x D
+                    setattr(
+                        self, '_' + attr, attr_tensor.view(
+                            attr_tensor.shape[0] * attr_tensor.shape[1],
+                            *attr_tensor.shape[2:]))
+                else:
+                    # `n_env` x `len(steps)` x D
+                    setattr(self, '_'+attr, torch.transpose(attr_tensor, 1, 0))
+
                 # squeeze timestep dimension if a single step is present
                 # print(attr, 'tensor shape', attr_tensor.shape, attr_tensor.dtype)
-                if len(self.steps) == 1:
+                # if len(self.steps) == 1:
                     # TODO: this doesnt really make a difference for networks
-                    setattr(self, '_'+attr, attr_tensor.squeeze(0))
-                else:
-                    setattr(self, '_'+attr, torch.transpose(attr_tensor, 1, 0))
+                    # setattr(self, '_'+attr, attr_tensor.squeeze(0))
+                # else:
         return True
 
     def _get_value(self, attr: str):

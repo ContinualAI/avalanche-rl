@@ -41,7 +41,8 @@ class RLBaseStrategy(BaseStrategy):
                          plugins=plugins, eval_every=eval_every, evaluator=evaluator)
 
         assert rollouts_per_step > 0 or max_steps_per_rollout > 0, "Must specify at least one terminal condition for rollouts!"
-
+        assert updates_per_step > 0, "Number of updates per step must be positve"
+        
         # if a single number is passed, assume it's steps
         if not isinstance(per_experience_steps, Timestep):
             per_experience_steps = Timestep(int(per_experience_steps))

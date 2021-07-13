@@ -15,26 +15,26 @@ class A2CStrategy(RLBaseStrategy):
     def __init__(
             self, model: nn.Module, optimizer: Optimizer,
             per_experience_steps: Union[int, Timestep],
-            rollouts_per_step: int = 1, value_criterion=nn.MSELoss(),
+            max_steps_per_rollout:int=5,
+            value_criterion=nn.MSELoss(),
             discount_factor: float = 0.99, device='cpu',
             plugins: Optional[Sequence[StrategyPlugin]] = [],
             eval_every: int = -1, eval_episodes: int = 1, 
             policy_loss_weight: float = 0.5,
             value_loss_weight: float = 0.5,
             evaluator=default_rl_logger):
-        # multiple steps per rollout is not supported as it would result 
-        # in a tensor of shape `n_envs`x`timesteps`x`obs_shape`
+        # multiple steps per rollout are supported through time dimension flattening
+        # e.g. working with tensors of shape `n_envs`*`timesteps`x`obs_shape`
         super().__init__(
             model, optimizer, per_experience_steps=per_experience_steps,
-            rollouts_per_step=rollouts_per_step,
-            # here we make sure timestep dimension isn't included in rollouts
-            max_steps_per_rollout=1,
+            # only support max steps as to avoid getting rollouts of different length
+            rollouts_per_step=-1,
+            max_steps_per_rollout=max_steps_per_rollout,
             device=device, plugins=plugins,
             discount_factor=discount_factor, eval_every=eval_every, 
             eval_episodes=eval_episodes, evaluator=evaluator)
         assert self.per_experience_steps.unit == TimestepUnit.STEPS, 'A2C only supports expressing training duration in steps not episodes'
 
-        # TODO: 'dataloader' calls with pre-processing env wrappers 
         self.model = model
         self.optimizer = optimizer
         self.value_criterion = value_criterion
@@ -59,10 +59,10 @@ class A2CStrategy(RLBaseStrategy):
         return Categorical(logits=policy_logits).sample().cpu().numpy()
 
     def update(self, rollouts: List[Rollout], n_update_steps: int):
-        # perform gradient step(s) over batch of gathered rollouts
+        # perform gradient step(s) over gathered rollouts
         self.loss = 0.
-        for rollout in rollouts:
-            # move samples to device for processing
+        for rollout in rollouts[:n_update_steps]:
+            # move samples to device for processing and expect tensor of shape `timesteps`x`n_envs`xD`
             rollout = rollout.to(self.device)
             # print("Rollout Observation shape", rollout.observations.shape)
             values, policy_logits = self.model(rollout.observations)

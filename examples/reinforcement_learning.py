@@ -1,3 +1,6 @@
+from avalanche.logging.interactive_logging import TqdmWriteInteractiveLogger
+from avalanche.evaluation.metrics.reward import EpLenghtPluginMetric, RewardPluginMetric
+from avalanche.logging.tensorboard_logger import TensorboardLogger
 from avalanche.training.strategies.reinforcement_learning import A2CStrategy, RLBaseStrategy, DQNStrategy
 from avalanche.training.strategies.reinforcement_learning.utils import Array2Tensor
 from avalanche.models.actor_critic import ActorCriticMLP
@@ -12,7 +15,8 @@ import torch
 import gym
 from torch.distributions import Categorical
 import numpy as np
-from avalanche.training import default_rl_logger
+from avalanche.training.plugins import EvaluationPlugin
+from avalanche.evaluation.metrics import cpu_usage_metrics, ram_usage_metrics, gpu_usage_metrics
 
 
 def evaluate(model: torch.nn.Module, n_episodes=10, device=torch.device('cpu')):
@@ -36,17 +40,42 @@ def evaluate(model: torch.nn.Module, n_episodes=10, device=torch.device('cpu')):
 
 
 if __name__ == "__main__":
+    # FIXME:
+    # tensorboard_logger = TensorboardLogger('../tensorboard_logs')
+
+    # eval_plugin = EvaluationPlugin(
+    #    cpu_usage_metrics(
+    #        minibatch=True, epoch=True,
+    #        experience=True, stream=True),
+    #    ram_usage_metrics(
+    #        every=0.5, minibatch=True, epoch=True,
+    #        experience=True, stream=True),
+    #    gpu_usage_metrics(
+    #        0, every=0.5, minibatch=True, epoch=True,
+    #        experience=True, stream=True),
+    #    RewardPluginMetric(
+    #        window_size=1000,
+    #        stats=['mean', 'max', 'std']),
+    #    EpLenghtPluginMetric(
+    #        window_size=1000,
+    #        stats=['mean', 'max', 'std']),
+    #    loggers=[
+    #             TqdmWriteInteractiveLogger(
+    #                 log_every=10),
+    #             tensorboard_logger])
+
     # device = torch.device('cpu')
     device = torch.device('cuda:0')
 
-    # ['CartPole-v0', 'CartPole-v1'..]
+    # FIXME: multi env is still bugged, single env works just fine
     scenario = gym_benchmark_generator(
         ['CartPole-v1'],
-        n_parallel_envs=1, eval_envs=['CartPole-v0'])
+        n_parallel_envs=1, eval_envs=['CartPole-v1'])
     # scenario = gym_benchmark_generator(['MountainCar-v0'], n_parallel_envs=1)
 
     # CartPole setting
-    model = ActorCriticMLP(4, 2, 64)
+    model = ActorCriticMLP(4, 2, 1024, 1024)
+    print("Model", model)
     # model = MLPDeepQN(input_size=4, hidden_size=128,
     #   n_actions=2, hidden_layers=2)
     # cl_strategy = Naive(model, optim, )
@@ -54,8 +83,8 @@ if __name__ == "__main__":
     optimizer = Adam(model.parameters(), lr=1e-4)
 
     strategy = A2CStrategy(
-        model, optimizer, per_experience_steps=100, max_steps_per_rollout=1,
-        device=device, eval_every=10, eval_episodes=100)
+        model, optimizer, per_experience_steps=100000, max_steps_per_rollout=5,
+        device=device, eval_every=10000, eval_episodes=100)
     # strategy = DQNStrategy(
     # model, optimizer, 1000, batch_size=32, exploration_fraction=.2, rollouts_per_step=10,
     # replay_memory_size=10000, updates_per_step=10, replay_memory_init_size=500, double_dqn=True,
@@ -71,8 +100,8 @@ if __name__ == "__main__":
         print('Training completed')
 
         print("Test stream", [e.environment for e in scenario.test_stream])
-        # print('Computing accuracy on the whole test set')
-        # results.append(strategy.eval(scenario.test_stream))
+        print('Computing accuracy on the whole test set')
+        results.append(strategy.eval(scenario.test_stream))
 
     rmean, rstd, lengths = evaluate(model, n_episodes=100, device=device)
     print(f"Reward mean/std: {rmean}, {rstd}. Episode lengths: {lengths}")
