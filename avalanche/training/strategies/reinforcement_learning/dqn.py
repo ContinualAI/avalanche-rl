@@ -9,6 +9,7 @@ from avalanche.training.plugins.strategy_plugin import StrategyPlugin
 from torch.optim import Optimizer
 import copy
 import random
+from avalanche.training import default_rl_logger
 
 class DQNStrategy(RLBaseStrategy):
 
@@ -30,12 +31,12 @@ class DQNStrategy(RLBaseStrategy):
             discount_factor: float = 0.99,
             device='cpu',
             plugins: Optional[Sequence[StrategyPlugin]] = [],
-            eval_every=-1):
+            eval_every=-1, evaluator=default_rl_logger):
         super().__init__(
             model, optimizer, per_experience_steps, criterion=criterion,
             rollouts_per_step=rollouts_per_step,
             updates_per_step=updates_per_step, device=device, plugins=plugins,
-            discount_factor=discount_factor, eval_every=eval_every)
+            discount_factor=discount_factor, eval_every=eval_every, evaluator=evaluator)
         if type(target_net_update_interval) is int:
             target_net_update_interval = Timestep(target_net_update_interval)
 

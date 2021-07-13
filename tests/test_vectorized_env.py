@@ -3,10 +3,10 @@ import gym
 from avalanche.training.strategies.reinforcement_learning.vectorized_env import VectorizedEnvironment
 import numpy as np
 import ray
-from avalanche.training.strategies.rl_utils import Array2Tensor, RGB2GrayWrapper, BufferWrapper, CropObservationWrapper
+from avalanche.training.strategies.reinforcement_learning.utils import Array2Tensor, RGB2GrayWrapper, BufferWrapper, CropObservationWrapper
 import torch
 
-
+# TODO: test with sleep in custom env
 def make_env(kwargs=dict()):
     return gym.make('CartPole-v1', **kwargs)
 
@@ -82,7 +82,7 @@ def test_auto_reset():
             assert 'terminal_observation' in info[idx]
             assert info[idx]['terminal_observation'].shape == obs[idx].shape
             # terminal obs different from initial one
-            assert sum(info[idx]['terminal_observation'] - obs[idx]) > 0
+            assert sum(info[idx]['terminal_observation'] - obs[idx]) != 0
 
         if done.any():
             break

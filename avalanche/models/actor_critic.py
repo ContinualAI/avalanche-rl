@@ -2,28 +2,50 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch
 from torch.distributions import Categorical
-
+from typing import List, Union
 
 class ActorCriticMLP(nn.Module):
-    # adapted from https://towardsdatascience.com/understanding-actor-critic-methods-931b97b6df3f
-    def __init__(self, num_inputs, num_actions, hidden_size):
+
+    def __init__(self, num_inputs, num_actions, actor_hidden_sizes: Union[int, List[int]]=[64, 64], critic_hidden_sizes: Union[int, List[int]]=[64, 64], activation_type:str='relu'):
         super(ActorCriticMLP, self).__init__()
         # these are actually 2 models in one
+        if type(actor_hidden_sizes) is int:
+            actor_hidden_sizes = [actor_hidden_sizes]
+        if type(critic_hidden_sizes) is int:
+            critic_hidden_sizes = [critic_hidden_sizes]
+        assert len(critic_hidden_sizes) and len(actor_hidden_sizes)
+        if activation_type == 'relu':
+            act = nn.ReLU()
+        elif activation_type == 'tanh':
+            act = nn.Tanh()
+        else:
+            raise ValueError(f"Unknown activation type {activation_type}")
 
-        self.critic_linear1 = nn.Linear(num_inputs, hidden_size)
-        self.critic_linear2 = nn.Linear(hidden_size, 1)
+        critic = [nn.Linear(critic_hidden_sizes[i], critic_hidden_sizes[i+1]) for i in range(1, len(critic_hidden_sizes)-1)]
+        actor = [nn.Linear(actor_hidden_sizes[i], actor_hidden_sizes[i+1]) for i in range(1, len(actor_hidden_sizes)-1)]
+        
+        # self.critic_linear2 = nn.Linear(hidden_size, 1)
+        self.critic = []
+        for layer in [nn.Linear(num_inputs, critic_hidden_sizes[0])]+critic:
+            self.critic.append(layer)
+            self.critic.append(act)
+        self.critic.append(nn.Linear(critic_hidden_sizes[-1], num_actions if num_actions>2 else 1))
+        self.critic = nn.Sequential(*self.critic)
 
-        self.actor_linear1 = nn.Linear(num_inputs, hidden_size)
-        self.actor_linear2 = nn.Linear(hidden_size, num_actions)
+        self.actor = []
+        for layer in [nn.Linear(num_inputs, actor_hidden_sizes[0])]+actor:
+            self.actor.append(layer)
+            self.actor.append(act)
+        self.actor.append(nn.Linear(actor_hidden_sizes[-1], num_actions))
+        self.actor = nn.Sequential(*self.actor)
+
     
     def forward(self, state: torch.Tensor, compute_policy=True, compute_value=True):
         value, policy_logits = None, None
         if compute_value:
-            value = F.relu(self.critic_linear1(state))
-            value = self.critic_linear2(value)
+            value = self.critic(state)
         if compute_policy:
-            policy_logits = F.relu(self.actor_linear1(state))
-            policy_logits = self.actor_linear2(policy_logits)
+            policy_logits = self.actor(state)
 
         return value, policy_logits
 

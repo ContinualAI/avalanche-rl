@@ -42,9 +42,9 @@ class RLBaseStrategy(BaseStrategy):
 
         assert rollouts_per_step > 0 or max_steps_per_rollout > 0, "Must specify at least one terminal condition for rollouts!"
 
-        # if a single integer is passed, assume it's steps
-        if type(per_experience_steps) is int:
-            per_experience_steps = Timestep(per_experience_steps)
+        # if a single number is passed, assume it's steps
+        if not isinstance(per_experience_steps, Timestep):
+            per_experience_steps = Timestep(int(per_experience_steps))
 
         self.per_experience_steps: Timestep = per_experience_steps
         self.rollouts_per_step = rollouts_per_step
@@ -167,8 +167,10 @@ class RLBaseStrategy(BaseStrategy):
         if self.n_envs == 1:
             env = VectorizedEnvWrapper(self.environment, auto_reset=True)
         else:
+            import multiprocessing
+            cpus = min(self.n_envs, multiprocessing.cpu_count())
             env = VectorizedEnvironment(
-                self.environment, self.n_envs, auto_reset=True)
+                self.environment, self.n_envs, auto_reset=True, ray_kwargs={'num_cpus': cpus})
         # NOTE: `info['terminal_observation']`` is NOT converted to tensor 
         return Array2Tensor(env)
 
@@ -250,8 +252,6 @@ class RLBaseStrategy(BaseStrategy):
 
             # periodic evaluation
             self._periodic_eval(eval_streams, do_final=False)
-            # FIXME: testing loggign
-            # self.after_training_epoch()
 
         self.total_steps += self.rollout_steps
         self.environment.close()

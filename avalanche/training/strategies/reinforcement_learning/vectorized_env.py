@@ -97,6 +97,7 @@ class VectorizedEnvironment(object):
             envs = [envs for _ in range(self.n_envs)]
         elif type(envs) is list:
             assert len(envs) == n_envs
+            self.env = envs[0]
             # envs = [lambda _ : envs[i] for i in range(n_envs)]
 
         # ray actor pool?
@@ -144,7 +145,6 @@ class VectorizedEnvironment(object):
         return ray.get(promises)
 
     def close(self):
-        # FIXME:
-        # promises = [actor.close.remote() for actor in self.actors]
-        # ray.get(promises)
+        promises = [actor.close.remote() for actor in self.actors]
+        ray.wait(promises)
         ray.shutdown()

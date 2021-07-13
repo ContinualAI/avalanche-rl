@@ -40,18 +40,19 @@ if __name__ == "__main__":
     device = torch.device('cuda:0')
 
     # ['CartPole-v0', 'CartPole-v1'..]
-    scenario = gym_benchmark_generator(['CartPole-v1'], n_parallel_envs=1, eval_envs=['CartPole-v0'])
+    scenario = gym_benchmark_generator(
+        ['CartPole-v1'],
+        n_parallel_envs=1, eval_envs=['CartPole-v0'])
     # scenario = gym_benchmark_generator(['MountainCar-v0'], n_parallel_envs=1)
 
-
     # CartPole setting
-    model = ActorCriticMLP(4, 2, 128)
+    model = ActorCriticMLP(4, 2, 64)
     # model = MLPDeepQN(input_size=4, hidden_size=128,
     #   n_actions=2, hidden_layers=2)
     # cl_strategy = Naive(model, optim, )
     # strategy = RLStrategy('MlpPolicy', [scenario.envs[0]], 'dqn', None, per_experience_episodes=3, eval_mb_size=1, device=device, )
     optimizer = Adam(model.parameters(), lr=1e-4)
-    
+
     strategy = A2CStrategy(
         model, optimizer, per_experience_steps=100, max_steps_per_rollout=1,
         device=device, eval_every=10, eval_episodes=100)
@@ -71,7 +72,7 @@ if __name__ == "__main__":
 
         print("Test stream", [e.environment for e in scenario.test_stream])
         # print('Computing accuracy on the whole test set')
-        # results.append(cl_strategy.eval(scenario.test_stream))
+        # results.append(strategy.eval(scenario.test_stream))
 
     rmean, rstd, lengths = evaluate(model, n_episodes=100, device=device)
     print(f"Reward mean/std: {rmean}, {rstd}. Episode lengths: {lengths}")

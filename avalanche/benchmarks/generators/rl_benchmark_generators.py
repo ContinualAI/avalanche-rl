@@ -44,7 +44,7 @@ def gym_benchmark_generator(
     if eval_envs is None:
         eval_envs = envs_
     elif len(eval_envs) and type(eval_envs[0]) is str:
-        eval_envs = [gym.make(ename, **env_kwargs.get(ename, {})) for ename in env_names]
+        eval_envs = [gym.make(ename, **env_kwargs.get(ename, {})) for ename in eval_envs]
         # TODO: delayed feature
         # if a list of env names is provided, we don't build the enviornment until actual evaluation occurs
         # eval_envs = [
