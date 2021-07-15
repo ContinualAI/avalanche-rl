@@ -5,8 +5,20 @@ import numpy as np
 import ray
 from avalanche.training.strategies.reinforcement_learning.utils import Array2Tensor, RGB2GrayWrapper, BufferWrapper, CropObservationWrapper
 import torch
+from gym import Env
 
-# TODO: test with sleep in custom env
+class CustomTestEnv(Env):
+    
+    def __init__(self):
+        pass
+    
+    def step(self, action):
+        return np.float32(float(action)), action, 0., {'action': action}
+        
+    def reset(self):
+        return np.float32(1.)
+
+
 def make_env(kwargs=dict()):
     return gym.make('CartPole-v1', **kwargs)
 
@@ -134,3 +146,29 @@ def test_env_different():
                 assert np.sum(obs[i]-obs[j]) > 0
 
     env.close()
+
+@pytest.mark.parametrize('shuffle', [True, False])
+def test_custom_env_rollout(shuffle:bool):
+    from avalanche.training.strategies.reinforcement_learning.buffers import Step, Rollout
+    n_steps = 10
+    n_envs = 7
+
+    env = CustomTestEnv()
+    env = VectorizedEnvironment(env, n_envs, auto_reset=True)
+
+    steps = []
+    action = np.arange(n_envs).reshape(-1, 1)
+    obs, r, done, _ = env.step(action)
+    obs = env.reset()
+
+    for _ in range(n_steps):
+        n_obs, r, done, _ = env.step(action)
+        step = Step(obs, action, done, r, n_obs)
+        steps.append(step)
+        obs = n_obs
+
+    rollout = Rollout(steps, n_envs=n_envs, _shuffle=shuffle)
+    assert (rollout.next_observations == rollout.actions).all() and (rollout.actions == rollout.rewards).all()
+    for attr in ['observations', 'actions', 'rewards', 'dones', 'next_observations']:
+        tensor = getattr(rollout, attr)
+        assert tensor.shape == torch.Size([n_steps*n_envs, 1])

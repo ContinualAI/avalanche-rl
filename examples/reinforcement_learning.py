@@ -64,10 +64,11 @@ if __name__ == "__main__":
     #                 log_every=10),
     #             tensorboard_logger])
 
-    # device = torch.device('cpu')
-    device = torch.device('cuda:0')
+    device = torch.device('cpu')
+    # device = torch.device('cuda:0')
 
     # FIXME: multi env is still bugged, single env works just fine
+    # works well if you use VectorizedEnv with 1 parallel env tho..
     scenario = gym_benchmark_generator(
         ['CartPole-v1'],
         n_parallel_envs=1, eval_envs=['CartPole-v1'])

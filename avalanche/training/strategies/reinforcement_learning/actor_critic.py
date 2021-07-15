@@ -66,21 +66,24 @@ class A2CStrategy(RLBaseStrategy):
             rollout = rollout.to(self.device)
             # print("Rollout Observation shape", rollout.observations.shape)
             values, policy_logits = self.model(rollout.observations)
-            # ~log(softmax(action_logits))
+            # ~log(softmax(taken_action_logits))
             # print("Rollout Actions shape", rollout.actions.shape)
+            # FIXME: remove view
             log_prob = Categorical(
                 logits=policy_logits).log_prob(
-                rollout.actions)
+                rollout.actions.view(-1,))
             # compute next states values
             next_values, _ = self.model(
                 rollout.next_observations, compute_policy=False)
             # mask terminal states values
-            next_values[rollout.dones] = 0.
+            next_values[rollout.dones.view(-1,)] = 0.
 
-            # print("Rollout Rewards shape", rollout.rewards.shape)
             # Actor/Policy Loss Term in A2C: A(s_t, a_t) * grad log (pi(a_t|s_t))
             boostrapped_returns = rollout.rewards + self.gamma * next_values
             advantages = boostrapped_returns - values 
+            # get advantages of taken actions a_t FIXME: this whill need view(-1,1)
+            advantages = advantages.gather(dim=1, index=rollout.actions)
+            # print("Rollout adv shape", advantages.shape, log_prob.shape, policy_logits.shape)
             policy_loss = -(advantages * log_prob).mean()
 
             # Value Loss Term: R_t + gamma * V(S_{t+1}) - V(S_t)

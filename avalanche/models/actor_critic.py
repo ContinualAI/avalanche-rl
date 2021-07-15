@@ -29,7 +29,7 @@ class ActorCriticMLP(nn.Module):
         for layer in [nn.Linear(num_inputs, critic_hidden_sizes[0])]+critic:
             self.critic.append(layer)
             self.critic.append(act)
-        self.critic.append(nn.Linear(critic_hidden_sizes[-1], num_actions if num_actions>2 else 1))
+        self.critic.append(nn.Linear(critic_hidden_sizes[-1], num_actions))
         self.critic = nn.Sequential(*self.critic)
 
         self.actor = []

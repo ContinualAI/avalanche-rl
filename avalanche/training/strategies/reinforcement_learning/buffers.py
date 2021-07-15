@@ -105,24 +105,34 @@ class Rollout:
 
         # swap attr axes to get desidered shape unravelled or flattened shape
         if self.n_envs > 0:
+
+            if self._shuffle and self._flatten_time:
+                perm = torch.randperm(
+                    attr_tensor.shape[0] * attr_tensor.shape[1])
+            elif self._shuffle and not self._flatten_time:
+                perm = torch.randperm(self.n_envs)
+
             for attr in [
                     'states', 'actions', 'rewards', 'dones', 'next_states']:
                 attr_tensor = getattr(self, '_'+attr)
                 if self._flatten_time:
                     # `n_env` *`len(steps)` x D
-                    setattr(
-                        self, '_' + attr, attr_tensor.view(
-                            attr_tensor.shape[0] * attr_tensor.shape[1],
-                            *attr_tensor.shape[2:]))
+                    attr_tensor = attr_tensor.view(
+                        attr_tensor.shape[0] * attr_tensor.shape[1],
+                        *attr_tensor.shape[2:])
                 else:
                     # `n_env` x `len(steps)` x D
-                    setattr(self, '_'+attr, torch.transpose(attr_tensor, 1, 0))
+                    attr_tensor = torch.transpose(attr_tensor, 1, 0)
 
+                if self._shuffle:    
+                    attr_tensor = attr_tensor[perm]
+
+                setattr(self, '_'+attr, attr_tensor)
                 # squeeze timestep dimension if a single step is present
                 # print(attr, 'tensor shape', attr_tensor.shape, attr_tensor.dtype)
                 # if len(self.steps) == 1:
-                    # TODO: this doesnt really make a difference for networks
-                    # setattr(self, '_'+attr, attr_tensor.squeeze(0))
+                # TODO: this doesnt really make a difference for networks
+                # setattr(self, '_'+attr, attr_tensor.squeeze(0))
                 # else:
         return True
 
@@ -221,6 +231,7 @@ class ReplayMemory:
             rollouts (List[Rollout]): [description]
         """
         # increase sample counter counting data from different actors as separate samples
+        # FIXME: should be more efficient
         for rollout in rollouts:
             for step in rollout.steps:
                 for actor_step in self._unravel_step(step):

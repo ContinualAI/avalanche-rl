@@ -36,9 +36,9 @@ class Actor:
             [type]: [description]
         """
         # try casting to numpy array
-        if type(action) is not np.ndarray:
-            action = np.array(action)
-        
+        # if type(action) is not np.ndarray:
+            # action = np.array(action)
+
         next_obs, reward, done, info = self.env.step(action)
         # auto-reset episode: obs you get is actually the first of the new episode, 
         # while the last obs is kept inside info
@@ -109,7 +109,7 @@ class VectorizedEnvironment(object):
     def _remote_vec_calls(self, fname: str, *args, **kwargs) -> Union[np.ndarray, List[Any]]:
         promises = [getattr(actor, fname).remote(*args, **kwargs)
                     for actor in self.actors]
-        return np.asarray(ray.get(promises))  # .reshape(self.n_envs, -1)
+        return np.asarray(ray.get(promises))
 
     def __getattr__(self, attr: str):
         if hasattr(self.env, attr):
