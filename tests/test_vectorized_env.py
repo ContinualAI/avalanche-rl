@@ -3,18 +3,19 @@ import gym
 from avalanche.training.strategies.reinforcement_learning.vectorized_env import VectorizedEnvironment
 import numpy as np
 import ray
-from avalanche.training.strategies.reinforcement_learning.utils import Array2Tensor, RGB2GrayWrapper, BufferWrapper, CropObservationWrapper
+from avalanche.training.strategies.reinforcement_learning.utils import Array2Tensor, FrameStackingWrapper, RGB2GrayWrapper, CropObservationWrapper
 import torch
 from gym import Env
 
+
 class CustomTestEnv(Env):
-    
+
     def __init__(self):
         pass
-    
+
     def step(self, action):
         return np.float32(float(action)), action, 0., {'action': action}
-        
+
     def reset(self):
         return np.float32(1.)
 
@@ -87,14 +88,17 @@ def test_auto_reset():
         actions = np.asarray([env.action_space.sample() for _ in range(4)])
         obs, _, done, info = env.step(actions)
         # get envs which are done
-        dones_idx = done.nonzero()[0]
+        dones_idx = done.reshape(-1, 1).nonzero()[0]
         assert len(info) == 4
 
-        for idx in dones_idx:
-            assert 'terminal_observation' in info[idx]
-            assert info[idx]['terminal_observation'].shape == obs[idx].shape
-            # terminal obs different from initial one
-            assert sum(info[idx]['terminal_observation'] - obs[idx]) != 0
+        for idx in range(4):
+            if idx in dones_idx:
+                assert 'terminal_observation' in info[idx]
+                assert info[idx]['terminal_observation'].shape == obs[idx].shape
+                # terminal obs different from initial one
+                assert sum(info[idx]['terminal_observation'] - obs[idx]) != 0
+            else:
+                assert 'terminal_observation' not in info[idx]
 
         if done.any():
             break
@@ -110,7 +114,7 @@ def test_env_wrapping():
             "Install `pip install gym[atari]` to run this test + download atari ROMs as explained here https://github.com/openai/atari-py#roms.")
     env = RGB2GrayWrapper(env)
     env = CropObservationWrapper(env, resize_shape=(84, 84))
-    env = BufferWrapper(env, resolution=(84, 84))
+    env = FrameStackingWrapper(env, resolution=(84, 84))
     venv = VectorizedEnvironment(env, 2, auto_reset=False)
     # can be wrapped like any env
     venv = Array2Tensor(venv)
@@ -147,8 +151,9 @@ def test_env_different():
 
     env.close()
 
+
 @pytest.mark.parametrize('shuffle', [True, False])
-def test_custom_env_rollout(shuffle:bool):
+def test_custom_env_rollout(shuffle: bool):
     from avalanche.training.strategies.reinforcement_learning.buffers import Step, Rollout
     n_steps = 10
     n_envs = 7
@@ -168,7 +173,9 @@ def test_custom_env_rollout(shuffle:bool):
         obs = n_obs
 
     rollout = Rollout(steps, n_envs=n_envs, _shuffle=shuffle)
-    assert (rollout.next_observations == rollout.actions).all() and (rollout.actions == rollout.rewards).all()
-    for attr in ['observations', 'actions', 'rewards', 'dones', 'next_observations']:
+    assert (rollout.next_observations == rollout.actions).all() and (
+        rollout.actions == rollout.rewards).all()
+    for attr in ['observations', 'actions', 'rewards', 'dones',
+                 'next_observations']:
         tensor = getattr(rollout, attr)
         assert tensor.shape == torch.Size([n_steps*n_envs, 1])

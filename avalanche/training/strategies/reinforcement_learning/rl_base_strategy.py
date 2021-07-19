@@ -1,3 +1,4 @@
+from collections import defaultdict
 import torch
 import torch.nn as nn
 from avalanche.training.strategies.base_strategy import BaseStrategy
@@ -13,7 +14,7 @@ from avalanche.training import default_rl_logger
 import enum
 from avalanche.training.strategies.reinforcement_learning.vectorized_env import VectorizedEnvironment
 from .buffers import Rollout, Step
-
+from itertools import count
 
 class TimestepUnit(enum.IntEnum):
     STEPS = 0
@@ -85,7 +86,7 @@ class RLBaseStrategy(BaseStrategy):
             "`sample_rollout_action` must be implemented by every RL strategy")
 
     def rollout(
-            self, env: Env, n_rollouts: int, max_steps: int = -1) -> Tuple[List[Rollout], int]:
+            self, env: Env, n_rollouts: int, max_steps: int = -1) -> List[Rollout]:
         """
         Gather experience from Environment leveraging VectorizedEnvironment for parallel interaction and 
         handling auto reset behavior.
@@ -103,16 +104,18 @@ class RLBaseStrategy(BaseStrategy):
             The number of steps performed is also always returned along with the rollouts.
         """
         # gather experience from env
-        t = 0
         rollout_counter = 0
         rollouts = []
         step_experiences = []
-        self.rewards, self.ep_lengths = [], []
+        self.rewards = []
+        # to compute timestep differences more efficiently
+        ep_len_sum = [sum(self.ep_lengths[k]) for k in range(self.n_envs)]
+
         # reset environment on first run
         if self._obs is None:
             self._obs = env.reset()
 
-        while True:
+        for t in count(start=1):
             # sample action(s) from policy moving observation to device; actions of shape `n_envs`xA
             action = self.sample_rollout_action(
                 self._obs.to(self.device))
@@ -122,10 +125,16 @@ class RLBaseStrategy(BaseStrategy):
 
             step_experiences.append(
                 Step(self._obs, action, dones, rewards, next_obs))
-            t += 1
+            self.rollout_steps += 1
             # keep track of all rewards for parallel environments
             self.rewards.extend(rewards.reshape(-1, ).tolist())
             self._obs = next_obs
+
+            dones_idx = dones.reshape(-1, 1).nonzero()[0]
+            for env_done in dones_idx:
+                self.ep_lengths[env_done].append(self.rollout_steps-ep_len_sum[env_done])
+                ep_len_sum[env_done] += self.ep_lengths[env_done][-1]
+                # print(self.rollout_steps, self.ep_lengths)
 
             # Vectorized env auto resets on done by default, check this flag to count episodes
             if n_rollouts > 0:
@@ -133,8 +142,6 @@ class RLBaseStrategy(BaseStrategy):
                 if dones.any() or (max_steps > 0 and len(step_experiences) >= max_steps):
                     rollouts.append(
                         Rollout(step_experiences, n_envs=self.n_envs))
-                    # minimum lenght among parallel simulation
-                    self.ep_lengths.append(len(step_experiences))
                     step_experiences = []
                     rollout_counter += 1
                     # TODO: if not auto_reset: self._obs = env.reset
@@ -146,8 +153,8 @@ class RLBaseStrategy(BaseStrategy):
             if max_steps > 0 and n_rollouts <= 0 and t >= max_steps:
                 rollouts.append(Rollout(step_experiences, n_envs=self.n_envs))
                 break
-
-        return rollouts, t
+        
+        return rollouts
 
     def update(self, rollouts: List[Rollout], n_update_steps: int):
         raise NotImplementedError(
@@ -163,7 +170,7 @@ class RLBaseStrategy(BaseStrategy):
             p.after_training(self, **kwargs)
 
     def make_train_env(self, **kwargs):
-        # TODO: can be passed as argument to specify transformations
+        # FIXME: add before-after callback to operate on env
         # maintain vectorized env interface without parallel overhead if `n_envs` is 1
         if self.n_envs == 1:
             env = VectorizedEnvWrapper(self.environment, auto_reset=True)
@@ -212,7 +219,10 @@ class RLBaseStrategy(BaseStrategy):
     def train_exp(self, experience: RLExperience, eval_streams, **kwargs):
         self.environment = experience.environment
         self.n_envs = experience.n_envs
+        # TODO:  keep track in default evaluator
         self.rollout_steps = 0
+        # one per (parallel) environment
+        self.ep_lengths:Dict[int, List[float]] = defaultdict(lambda: list([0]))
 
         # Data Adaptation (e.g. add new samples/data augmentation)
         # self.before_train_dataset_adaptation(**kwargs)
@@ -230,12 +240,10 @@ class RLBaseStrategy(BaseStrategy):
         # either run N episodes or steps depending on specified `per_experience_steps`
         for self.timestep in range(self.per_experience_steps.value):
             self.before_rollout(**kwargs)
-            self.rollouts, steps = self.rollout(
+            self.rollouts = self.rollout(
                 env=self.environment, n_rollouts=self.rollouts_per_step,
                 max_steps=self.max_steps_per_rollout)
             self.after_rollout(**kwargs)
-            # TODO: to keep track in default evaluator and do that in callback
-            self.rollout_steps += steps
 
             # update must instatiate `self.loss`
             self.update(self.rollouts, self.updates_per_step)
@@ -330,7 +338,10 @@ class RLBaseStrategy(BaseStrategy):
         return res
 
     def evaluate_exp(self):
-        self.rewards, self.ep_lengths = [], []
+        # rewards per episode
+        self.rewards = []
+        # single env only here
+        self.eval_ep_lengths = {0: []}
 
         for _ in range(self.eval_episodes):
             obs = self.environment.reset()
@@ -342,7 +353,7 @@ class RLBaseStrategy(BaseStrategy):
                 # TODO: use info
                 self.rewards.append(r)
                 t += 1
-            self.ep_lengths.append(t)
+            self.eval_ep_lengths[0].append(t)
         # needed if env comes from train stream and is thus shared
         self.environment.reset()
         self.environment.close()

@@ -38,10 +38,9 @@ if __name__ == "__main__":
             key = cv2.waitKey(25)
             if key == ord('q'):
                 exit()
-            elif key == ord('a'):
-                action = 0
-            elif key == ord('d'):
-                action = 1
+            for i in range(10):
+                if key == ord(str(i)):
+                    action = i
             if action is not None:
                 obs, _, done, _ = env.step(action)
             env.render()

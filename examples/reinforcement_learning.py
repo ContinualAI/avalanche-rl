@@ -76,6 +76,7 @@ if __name__ == "__main__":
 
     # CartPole setting
     model = ActorCriticMLP(4, 2, 1024, 1024)
+    # model = ActorCriticMLP(2, 3, 512, 512)
     print("Model", model)
     # model = MLPDeepQN(input_size=4, hidden_size=128,
     #   n_actions=2, hidden_layers=2)

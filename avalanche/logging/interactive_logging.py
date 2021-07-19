@@ -117,6 +117,10 @@ class TqdmWriteInteractiveLogger(InteractiveLogger):
                             metric_values: List['MetricValue'], **kwargs):
         super().before_training_exp(strategy, metric_values, **kwargs)
         self._progress.total = strategy.per_experience_steps.value
+    
+    def after_training_exp(self, strategy: 'BaseStrategy', metric_values: List['MetricValue'], **kwargs):
+        self._end_progress()
+        return super().after_training_exp(strategy, metric_values, **kwargs)
 
     def after_update(self, strategy: 'BaseStrategy',
                      metric_values: List['MetricValue'], **kwargs):

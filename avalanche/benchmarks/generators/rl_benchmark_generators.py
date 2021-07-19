@@ -66,6 +66,7 @@ def gym_benchmark_generator(
 
 
 def atari_benchmark_generator() -> RLScenario:
+    # TODO: setup env wrappers
     pass
 
 

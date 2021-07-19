@@ -13,6 +13,7 @@ from typing import SupportsFloat
 
 from avalanche.evaluation import Metric
 from typing import List
+import numpy as np
 
 class Mean(Metric[float]):
     """
@@ -86,7 +87,7 @@ class WindowedMovingAverage(Metric[float]):
 
     def result(self)->float:
         if not len(self.window):
-            return 0.
+            return np.float('-inf')
         return sum(self.window)/len(self.window)
 
     def reset(self):

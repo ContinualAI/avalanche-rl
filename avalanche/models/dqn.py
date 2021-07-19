@@ -13,7 +13,8 @@ class MLPDeepQN(SimpleMLP):
             hidden_layers: int = 1):
         # it does use dropout
         super().__init__(num_classes=n_actions, input_size=input_size,
-                         hidden_size=hidden_size, hidden_layers=hidden_layers)
+                         hidden_size=hidden_size, hidden_layers=hidden_layers, dropout=False)
+                         
 
     @torch.no_grad()
     def get_action(self, observation: torch.Tensor):

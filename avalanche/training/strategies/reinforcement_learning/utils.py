@@ -41,11 +41,11 @@ class CropObservationWrapper(ObservationWrapper):
 
 
 
-class BufferWrapper(ObservationWrapper):
+class FrameStackingWrapper(ObservationWrapper):
     """"Wrapper for image stacking"""
 
     def __init__(self, env, n_steps=4, resolution=(84, 84), dtype=np.float32):
-        super(BufferWrapper, self).__init__(env)
+        super(FrameStackingWrapper, self).__init__(env)
         self.dtype = dtype
         self.buffer = None
         old_space = env.observation_space

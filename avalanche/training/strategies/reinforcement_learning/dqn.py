@@ -11,6 +11,7 @@ import copy
 import random
 from avalanche.training import default_rl_logger
 
+
 class DQNStrategy(RLBaseStrategy):
 
     def __init__(
@@ -27,16 +28,16 @@ class DQNStrategy(RLBaseStrategy):
             exploration_fraction: float = 0.1,
             double_dqn: bool = True,
             target_net_update_interval: Union[int, Timestep] = 10000,
-            polyak_update_tau: float = 0.01,  # set to 1. to hard copy
+            polyak_update_tau: float = 1.,  # set to 1. to hard copy
             discount_factor: float = 0.99,
             device='cpu',
             plugins: Optional[Sequence[StrategyPlugin]] = [],
-            eval_every=-1, evaluator=default_rl_logger):
+            eval_every: int = -1, eval_episodes: int = 1, evaluator=default_rl_logger):
         super().__init__(
             model, optimizer, per_experience_steps, criterion=criterion,
-            rollouts_per_step=rollouts_per_step,
+            rollouts_per_step=rollouts_per_step, max_steps_per_rollout=-1,
             updates_per_step=updates_per_step, device=device, plugins=plugins,
-            discount_factor=discount_factor, eval_every=eval_every, evaluator=evaluator)
+            discount_factor=discount_factor, eval_every=eval_every, eval_episodes=eval_episodes, evaluator=evaluator)
         if type(target_net_update_interval) is int:
             target_net_update_interval = Timestep(target_net_update_interval)
 
@@ -64,7 +65,7 @@ class DQNStrategy(RLBaseStrategy):
         """
             Linearly decrease exploration rate `self.eps` up to `self.final_eps` in a 
             fraction of the total timesteps (`exploration_fraction`).
-            This will reset to `self._init_eps` on new experience.
+            It will reset to `self._init_eps` on new experience.
         """
         # TODO: log this values
         new_value = self._init_eps - experience_timestep * self.eps_decay
@@ -85,10 +86,9 @@ class DQNStrategy(RLBaseStrategy):
                               out=target_param.data)
 
     def before_training_exp(self, **kwargs):
-        # initialize replay memory with collected data before training on new env, taking into account multiple workers
-        rollouts, _ = self.rollout(
-            self.environment, self.replay_init_size,
-            max_steps=self.replay_init_size//self.n_envs) 
+        # initialize replay memory with collected data before first experience, taking into account multiple workers
+        rollouts = self.rollout(
+            self.environment, n_rollouts=-1, max_steps=self.replay_init_size//self.n_envs) 
         if self.replay_memory is None:
             self.replay_memory = ReplayMemory(
                 size=self.replay_size, n_envs=self.n_envs)
@@ -131,7 +131,7 @@ class DQNStrategy(RLBaseStrategy):
                 self.environment.action_space.sample()
                 for _ in range(self.n_envs)]
             actions = np.asarray(actions, dtype=np.int64)
-        # actors run on cpu, return numpy array #
+        # actors run on cpu, return numpy array
         return actions
 
     @torch.no_grad()
@@ -156,6 +156,7 @@ class DQNStrategy(RLBaseStrategy):
         return next_q_values
 
     def update(self, rollouts: List[Rollout], n_update_steps: int):
+        self.loss = 0.
         for _ in range(n_update_steps):
             # sample batch of steps/experiences from memory
             batch = self.replay_memory.sample_batch(self.batch_dim, self.device)
@@ -175,6 +176,6 @@ class DQNStrategy(RLBaseStrategy):
             q_target = batch.rewards + self.gamma * \
                 (1 - batch.dones.int()) * next_q_values.unsqueeze(-1)
 
-            self.loss = self._criterion(q_pred, q_target)
+            self.loss += self._criterion(q_pred, q_target)
 
             # TODO: gradient norm clipping?

@@ -2,6 +2,7 @@ import torch
 from typing import Union, List
 from dataclasses import dataclass, field
 import numpy as np
+import random
 
 
 @dataclass
@@ -256,14 +257,10 @@ class ReplayMemory:
             [type]: [description]
         """
         if batch_dim > len(self._memory):
-            raise Exception("Sample dimension exceed current memory size")
-        # return Rollout([s.to(device) for s in np.random.choice(
-        #                    self._memory, size=batch_dim,
-        #                 replace=False)], n_envs=-1)
-        return Rollout(np.random.choice(
-                           self._memory, size=batch_dim,
-                        replace=False).tolist(),
-                       n_envs=-1).to(device)
+            raise ValueError("Sample dimension exceeds current memory size")
+        # faster than alternatives
+        return Rollout([self._memory[i] for i in np.random.choice(len(self), size=batch_dim, replace=False)], n_envs=-1).to(device)
+        # return Rollout(np.random.choice(self._memory, size=batch_dim, replace=False).tolist(), n_envs=-1).to(device)
 
     def __len__(self):
         return len(self._memory)
