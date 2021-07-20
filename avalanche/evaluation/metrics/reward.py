@@ -45,7 +45,10 @@ class MovingWindowedStatsPluginMetric(PluginMetric[List[float]]):
             if 'min' == stat:
                 values.append(np.amin(self._moving_window.window, initial=np.float('-inf')))
             if 'std' == stat:
-                values.append(np.std(self._moving_window.window))
+                if len(self._moving_window.window):
+                    values.append(np.std(self._moving_window.window))
+                else:
+                    values.append(0.)
         return values
 
     def __str__(self) -> str:
@@ -58,31 +61,32 @@ class MovingWindowedStatsPluginMetric(PluginMetric[List[float]]):
 
 
 class RewardPluginMetric(MovingWindowedStatsPluginMetric):
-    # FIXME: this won't ever move from -1 for envs with -1 reward per step
+    """
+        Keep track of sum of rewards (returns) per episode.
+    """
+
     def __init__(
-            self, window_size: int, name: str = 'Reward', eval_ony=False, *args,
+            self, window_size: int, name: str = 'Reward', *args,
             **kwargs):
         super().__init__(window_size, name=name, *args, **kwargs)
-        self.eval_only = eval_ony
 
-    def update(self, strategy):
-        for r in strategy.rewards:
-            self._moving_window.update(r)
+    def update(self, strategy, is_eval:bool):
+        rewards = strategy.eval_rewards if is_eval else strategy.rewards 
+        for return_ in rewards['past_returns']:
+            self._moving_window.update(return_)
     # Train
     def after_rollout(self, strategy) -> None:
-        if not self.eval_only:
-            self.update(strategy)
+        self.update(strategy, False)
 
     def after_update(self, strategy) -> 'MetricResult':
-        if not self.eval_only:
-            return self.emit()
+        return self.emit()
 
     # Eval
     def before_eval_exp(self, strategy: 'BaseStrategy') -> MetricResult:
         self.reset()
 
     def after_eval_exp(self, strategy: 'BaseStrategy') -> MetricResult:
-        self.update(strategy)
+        self.update(strategy, True)
         return self.emit()
     
     def after_eval(self, strategy: 'BaseStrategy') -> 'MetricResult':

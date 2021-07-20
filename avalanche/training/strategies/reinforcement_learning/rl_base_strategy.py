@@ -16,6 +16,7 @@ from avalanche.training.strategies.reinforcement_learning.vectorized_env import 
 from .buffers import Rollout, Step
 from itertools import count
 
+
 class TimestepUnit(enum.IntEnum):
     STEPS = 0
     EPISODES = 1
@@ -43,7 +44,7 @@ class RLBaseStrategy(BaseStrategy):
 
         assert rollouts_per_step > 0 or max_steps_per_rollout > 0, "Must specify at least one terminal condition for rollouts!"
         assert updates_per_step > 0, "Number of updates per step must be positve"
-        
+
         # if a single number is passed, assume it's steps
         if not isinstance(per_experience_steps, Timestep):
             per_experience_steps = Timestep(int(per_experience_steps))
@@ -107,7 +108,7 @@ class RLBaseStrategy(BaseStrategy):
         rollout_counter = 0
         rollouts = []
         step_experiences = []
-        self.rewards = []
+
         # to compute timestep differences more efficiently
         ep_len_sum = [sum(self.ep_lengths[k]) for k in range(self.n_envs)]
 
@@ -127,13 +128,19 @@ class RLBaseStrategy(BaseStrategy):
                 Step(self._obs, action, dones, rewards, next_obs))
             self.rollout_steps += 1
             # keep track of all rewards for parallel environments
-            self.rewards.extend(rewards.reshape(-1, ).tolist())
+            self.rewards['curr_returns'] += rewards.reshape(-1,)
+
             self._obs = next_obs
 
             dones_idx = dones.reshape(-1, 1).nonzero()[0]
             for env_done in dones_idx:
-                self.ep_lengths[env_done].append(self.rollout_steps-ep_len_sum[env_done])
+                self.ep_lengths[env_done].append(
+                    self.rollout_steps-ep_len_sum[env_done])
                 ep_len_sum[env_done] += self.ep_lengths[env_done][-1]
+                # record done episode returns
+                self.rewards['past_returns'].append(
+                    self.rewards['curr_returns'][env_done])
+                self.rewards['curr_returns'][env_done] = 0.
                 # print(self.rollout_steps, self.ep_lengths)
 
             # Vectorized env auto resets on done by default, check this flag to count episodes
@@ -153,24 +160,22 @@ class RLBaseStrategy(BaseStrategy):
             if max_steps > 0 and n_rollouts <= 0 and t >= max_steps:
                 rollouts.append(Rollout(step_experiences, n_envs=self.n_envs))
                 break
-        
+
         return rollouts
 
     def update(self, rollouts: List[Rollout], n_update_steps: int):
         raise NotImplementedError(
             "`update` must be implemented by every RL strategy")
 
-    # FIXME: support old callbacks
-    def before_training(self, **kwargs):
+    def before_make_env(self, **kwargs):
         for p in self.plugins:
-            p.before_training(self, **kwargs)
+            p.before_make_env(self, **kwargs)
 
-    def after_training(self, **kwargs):
+    def after_make_env(self, **kwargs):
         for p in self.plugins:
-            p.after_training(self, **kwargs)
+            p.after_make_env(self, **kwargs)
 
     def make_train_env(self, **kwargs):
-        # FIXME: add before-after callback to operate on env
         # maintain vectorized env interface without parallel overhead if `n_envs` is 1
         if self.n_envs == 1:
             env = VectorizedEnvWrapper(self.environment, auto_reset=True)
@@ -178,7 +183,8 @@ class RLBaseStrategy(BaseStrategy):
             import multiprocessing
             cpus = min(self.n_envs, multiprocessing.cpu_count())
             env = VectorizedEnvironment(
-                self.environment, self.n_envs, auto_reset=True, ray_kwargs={'num_cpus': cpus})
+                self.environment, self.n_envs, auto_reset=True,
+                ray_kwargs={'num_cpus': cpus})
         # NOTE: `info['terminal_observation']`` is NOT converted to tensor 
         return Array2Tensor(env)
 
@@ -213,7 +219,6 @@ class RLBaseStrategy(BaseStrategy):
 
         self.is_training = False
         res = self.evaluator.get_last_metrics()
-        print("metrics", res)
         return res
 
     def train_exp(self, experience: RLExperience, eval_streams, **kwargs):
@@ -222,14 +227,17 @@ class RLBaseStrategy(BaseStrategy):
         # TODO:  keep track in default evaluator
         self.rollout_steps = 0
         # one per (parallel) environment
-        self.ep_lengths:Dict[int, List[float]] = defaultdict(lambda: list([0]))
+        self.ep_lengths: Dict[int, List[float]] = defaultdict(lambda: list([0]))
+        # curr episode returns (per actor) - previous episodes returns 
+        self.rewards = {'curr_returns': np.zeros(
+                            (self.n_envs,),
+                            dtype=np.float32),
+                        'past_returns': []}
 
-        # Data Adaptation (e.g. add new samples/data augmentation)
-        # self.before_train_dataset_adaptation(**kwargs)
-        # self.train_dataset_adaptation(**kwargs)
-        # self.after_train_dataset_adaptation(**kwargs)
-        # self.make_train_dataloader(**kwargs)
+        # Environment creation
+        self.before_make_env(**kwargs)
         self.environment = self.make_train_env(**kwargs)
+        self.after_make_env(**kwargs)
 
         # Model Adaptation (e.g. freeze/add new units)
         # self.model_adaptation()
@@ -321,8 +329,11 @@ class RLBaseStrategy(BaseStrategy):
             self.environment = self.experience.environment
             # only single env supported during evaluation
             self.n_envs = self.experience.n_envs
-
+            
+            # Create test Environment
+            self.before_make_env(**kwargs)
             self.environment = self.make_eval_env(**kwargs)
+            self.after_make_env(**kwargs)
 
             # Model Adaptation (e.g. freeze/add new units)
             # self.model_adaptation()
@@ -339,22 +350,23 @@ class RLBaseStrategy(BaseStrategy):
 
     def evaluate_exp(self):
         # rewards per episode
-        self.rewards = []
+        self.eval_rewards = {'past_returns': [
+            0. for _ in range(self.eval_episodes)]}
         # single env only here
         self.eval_ep_lengths = {0: []}
 
-        for _ in range(self.eval_episodes):
+        for ep_no in range(self.eval_episodes):
             obs = self.environment.reset()
             done = False
             t = 0
             while not done:
                 action = self.model.get_action(obs.unsqueeze(0).to(self.device))
-                obs, r, done, info = self.environment.step(action.item())
+                obs, reward, done, info = self.environment.step(action.item())
                 # TODO: use info
-                self.rewards.append(r)
+                self.eval_rewards['past_returns'][ep_no] += reward
                 t += 1
             self.eval_ep_lengths[0].append(t)
+
         # needed if env comes from train stream and is thus shared
         self.environment.reset()
         self.environment.close()
-        # return rewards, lengths
