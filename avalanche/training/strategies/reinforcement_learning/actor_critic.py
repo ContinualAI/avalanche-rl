@@ -14,7 +14,7 @@ class A2CStrategy(RLBaseStrategy):
 
     def __init__(
             self, model: nn.Module, optimizer: Optimizer,
-            per_experience_steps: Union[int, Timestep],
+            per_experience_steps: Union[int, Timestep, List[Timestep]],
             max_steps_per_rollout:int=5,
             value_criterion=nn.MSELoss(),
             discount_factor: float = 0.99, device='cpu',
@@ -33,7 +33,9 @@ class A2CStrategy(RLBaseStrategy):
             device=device, plugins=plugins,
             discount_factor=discount_factor, eval_every=eval_every, 
             eval_episodes=eval_episodes, evaluator=evaluator)
-        assert self.per_experience_steps.unit == TimestepUnit.STEPS, 'A2C only supports expressing training duration in steps not episodes'
+            
+        for exp_step in self.per_experience_steps:
+            exp_step.unit == TimestepUnit.STEPS, 'A2C only supports expressing training duration in steps not episodes'
 
         self.model = model
         self.optimizer = optimizer

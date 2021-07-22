@@ -31,7 +31,7 @@ class Timestep:
 class RLBaseStrategy(BaseStrategy):
     def __init__(
             self, model: nn.Module, optimizer: Optimizer,
-            per_experience_steps: Union[int, Timestep],
+            per_experience_steps: Union[int, Timestep, List[Timestep]],
             criterion=nn.MSELoss(),
             rollouts_per_step: int = 1, max_steps_per_rollout: int = -1,
             updates_per_step: int = 1, device='cpu',
@@ -46,10 +46,12 @@ class RLBaseStrategy(BaseStrategy):
         assert updates_per_step > 0, "Number of updates per step must be positve"
 
         # if a single number is passed, assume it's steps
-        if not isinstance(per_experience_steps, Timestep):
-            per_experience_steps = Timestep(int(per_experience_steps))
+        if isinstance(per_experience_steps, (int, float)):
+            per_experience_steps = [Timestep(int(per_experience_steps))]
+        elif isinstance(per_experience_steps, Timestep):
+            per_experience_steps = [per_experience_steps]
 
-        self.per_experience_steps: Timestep = per_experience_steps
+        self.per_experience_steps: List[Timestep] = per_experience_steps
         self.rollouts_per_step = rollouts_per_step
         self.max_steps_per_rollout = max_steps_per_rollout
         self.updates_per_step = updates_per_step
@@ -61,6 +63,13 @@ class RLBaseStrategy(BaseStrategy):
         # defined by the experience
         self.n_envs: int = None
         self.eval_episodes = eval_episodes
+
+    @property
+    def current_experience_steps(self)->Timestep:
+        """
+            Return number of steps to perform for current experience (only valid during training).
+        """
+        return self.per_experience_steps[self.experience.current_experience%len(self.per_experience_steps)]
 
     # Additional callback added by RLBaseStrategy
     def before_rollout(self, **kwargs):
@@ -246,7 +255,7 @@ class RLBaseStrategy(BaseStrategy):
         self.before_training_exp(**kwargs)
 
         # either run N episodes or steps depending on specified `per_experience_steps`
-        for self.timestep in range(self.per_experience_steps.value):
+        for self.timestep in range(self.current_experience_steps.value):
             self.before_rollout(**kwargs)
             self.rollouts = self.rollout(
                 env=self.environment, n_rollouts=self.rollouts_per_step,

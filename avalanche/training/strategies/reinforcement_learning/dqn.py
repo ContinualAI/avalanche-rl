@@ -16,8 +16,9 @@ class DQNStrategy(RLBaseStrategy):
 
     def __init__(
             self, model: nn.Module, optimizer: Optimizer,
-            per_experience_steps: Union[int, Timestep], 
+            per_experience_steps: Union[int, Timestep, List[Timestep]], 
             rollouts_per_step: int = 8,  # how often do you perform an update step
+            max_steps_per_rollout: int = -1,
             replay_memory_size: int = 10000,
             replay_memory_init_size: int = 5000,
             updates_per_step=1,
@@ -33,15 +34,17 @@ class DQNStrategy(RLBaseStrategy):
             device='cpu',
             plugins: Optional[Sequence[StrategyPlugin]] = [],
             eval_every: int = -1, eval_episodes: int = 1, evaluator=default_rl_logger):
-        super().__init__(
-            model, optimizer, per_experience_steps, criterion=criterion,
-            rollouts_per_step=rollouts_per_step, max_steps_per_rollout=-1,
-            updates_per_step=updates_per_step, device=device, plugins=plugins,
-            discount_factor=discount_factor, eval_every=eval_every, eval_episodes=eval_episodes, evaluator=evaluator)
+        super().__init__(model, optimizer, per_experience_steps,
+                         criterion=criterion, rollouts_per_step=rollouts_per_step,
+                         max_steps_per_rollout=max_steps_per_rollout,
+                         updates_per_step=updates_per_step, device=device, plugins=plugins,
+                         discount_factor=discount_factor, eval_every=eval_every,
+                         eval_episodes=eval_episodes, evaluator=evaluator)
         if type(target_net_update_interval) is int:
-            target_net_update_interval = Timestep(target_net_update_interval)
+            target_net_update_interval:Timestep = Timestep(target_net_update_interval)
+        for exp_step in self.per_experience_steps:
+            assert target_net_update_interval.unit == exp_step.unit, "You must express the target network interval using the same unit as the training lenght"
 
-        assert target_net_update_interval.unit == self.per_experience_steps.unit, "You must express the target network interval using the same unit as the training lenght"
         self.replay_memory: ReplayMemory = None
         self.replay_init_size = replay_memory_init_size
         self.replay_size = replay_memory_size
@@ -54,9 +57,7 @@ class DQNStrategy(RLBaseStrategy):
         self._init_eps = initial_epsilon
         self.eps = initial_epsilon
         self.final_eps = final_epsilon
-        # compute linear decay rate from specified fraction and specified timestep unit
-        self.eps_decay = (self._init_eps - self.final_eps) / (
-            exploration_fraction * self.per_experience_steps.value)
+        self.expl_fr = exploration_fraction
 
         # initialize target network
         self.target_net = copy.deepcopy(self.model)
@@ -86,14 +87,20 @@ class DQNStrategy(RLBaseStrategy):
                               out=target_param.data)
 
     def before_training_exp(self, **kwargs):
+        # compute linear decay rate from specified fraction and specified timestep unit 
+        # for this experience (supports different number of steps per experience)
+        self.eps_decay = (self._init_eps - self.final_eps) / (self.expl_fr * self.current_experience_steps.value)
+
         # initialize replay memory with collected data before first experience, taking into account multiple workers
         rollouts = self.rollout(
-            self.environment, n_rollouts=-1, max_steps=self.replay_init_size//self.n_envs) 
+            self.environment, n_rollouts=-1, max_steps=self.replay_init_size //
+            self.n_envs)
         if self.replay_memory is None:
             self.replay_memory = ReplayMemory(
                 size=self.replay_size, n_envs=self.n_envs)
 
         self.replay_memory.add_rollouts(rollouts)
+        return super().before_training_exp()
 
     def before_rollout(self, **kwargs):
         # update exploration rate

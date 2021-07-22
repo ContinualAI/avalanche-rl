@@ -40,7 +40,7 @@ class RLScenario(GenericCLScenario['RLExperience']):
         if n_experiences < len(self.envs):
             self.envs = self.envs[:n_experiences]
         elif n_experiences > len(self.envs):
-            # cycle through envs sequentially
+            # cycle through envs sequentially, referencing same object
             for i in range(n_experiences - len(self.envs)):
                 self.envs.append(self.envs[i % len(self.envs)])
         

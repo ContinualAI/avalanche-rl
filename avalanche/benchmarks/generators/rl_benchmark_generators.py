@@ -44,7 +44,8 @@ def gym_benchmark_generator(
     if eval_envs is None:
         eval_envs = envs_
     elif len(eval_envs) and type(eval_envs[0]) is str:
-        eval_envs = [gym.make(ename, **env_kwargs.get(ename, {})) for ename in eval_envs]
+        eval_envs = [gym.make(ename, **env_kwargs.get(ename, {}))
+                     for ename in eval_envs]
         # TODO: delayed feature
         # if a list of env names is provided, we don't build the enviornment until actual evaluation occurs
         # eval_envs = [
@@ -71,10 +72,75 @@ def atari_benchmark_generator() -> RLScenario:
 
 
 # check AvalancheLab extra dependency
-if importlib.util.find_spec('avalanche_lab') is not None:
-    from avalanche_lab.config import AvalancheConfig
+if importlib.util.find_spec('continual_habitat_lab') is not None and importlib.util.find_spec('habitat_sim') is not None:
+    from continual_habitat_lab import ContinualHabitatLabConfig, ContinualHabitatEnv
+    from continual_habitat_lab.scene_manager import SceneManager
+    from avalanche.training.strategies.reinforcement_learning.rl_base_strategy import TimestepUnit, Timestep
+
+    def _compute_experiences_length(
+            task_change_steps: int, scene_change_steps: int, n_exps: int,
+            unit: TimestepUnit) -> List[Timestep]:
+        # change experience every time either task or scene changes (might happen at non-uniform timesteps) 
+        change1 = min(task_change_steps, scene_change_steps)
+        change2 = max(task_change_steps, scene_change_steps) - change1
+
+        # those two timestep will alternate
+        steps = [Timestep(change1, unit), Timestep(change2, unit)]
+        return [steps[i % 2] for i in range(n_exps)]
 
     def habitat_benchmark_generator(
-            avl_lab_config: AvalancheConfig, *args, **kwargs) -> RLScenario:
-        # TODO: instatiate RLScenario from a given avalanche lab configuration
-        pass
+            cl_habitat_lab_config: ContinualHabitatLabConfig,
+            # eval_config: ContinualHabitatLabConfig = None, 
+            max_steps_per_experience: int = 1000,
+            change_experience_on_scene_change: bool = False,
+            *args, **kwargs) -> Tuple[RLScenario, List[Timestep]]:
+
+        # number of experiences as the number of tasks defined in configuration
+        n_exps = len(cl_habitat_lab_config.tasks)
+
+        # compute number of steps per experience
+        steps_per_experience = Timestep(max_steps_per_experience)
+        task_len_in_episodes = cl_habitat_lab_config.task_iterator.get('max_task_repeat_episodes', -1)
+        task_len_in_steps = cl_habitat_lab_config.task_iterator.get('max_task_repeat_steps', -1)
+
+        if task_len_in_episodes > 0:
+            steps_per_experience = Timestep(
+                task_len_in_episodes, TimestepUnit.EPISODES)
+        elif task_len_in_steps > 0:
+            steps_per_experience = Timestep(
+                task_len_in_steps, TimestepUnit.STEPS)
+
+        # whether to account every change of scene as a new experience (scene_path inhibits scene change)
+        if change_experience_on_scene_change and cl_habitat_lab_config.scene.scene_path is None:
+            # count number of scenes
+            sm = SceneManager(cl_habitat_lab_config)
+            for _, scenes in sm._scenes_by_dataset.items():
+                n_exps += len(scenes)
+            scene_change_in_episodes = cl_habitat_lab_config.scene.max_scene_repeat_episodes
+            scene_change_in_steps = cl_habitat_lab_config.scene.max_scene_repeat_steps
+            if scene_change_in_episodes > 0:
+                assert steps_per_experience.unit == TimestepUnit.EPISODES, "Step unit between simulator and avalanche setting must match!"
+                steps_per_experience = _compute_experiences_length(
+                    steps_per_experience.value, scene_change_in_episodes,
+                    n_exps, steps_per_experience.unit)
+            if scene_change_in_steps > 0:
+                assert steps_per_experience.unit == TimestepUnit.STEPS, "Step unit between simulator and avalanche setting must match!"
+                steps_per_experience = _compute_experiences_length(
+                    steps_per_experience.value, scene_change_in_steps, n_exps,
+                    steps_per_experience.unit)
+        else:
+            steps_per_experience = [steps_per_experience] * n_exps
+
+        # instatiate RLScenario from a given lab configuration
+        env = ContinualHabitatEnv(cl_habitat_lab_config)
+        # TODO: evaluating on same env changes its state, must have some evaluation mode
+        # if eval_config is None:
+            # eval_env = env
+
+        # also return computed number of steps per experience
+        # NOTE: parallel_env only supported on distributed settings due to opengl lock
+        # TODO: test with multiple gpus?
+        return RLScenario(
+            envs=[env],
+            n_experiences=n_exps, n_parallel_envs=1, eval_envs=[env],
+            *args, **kwargs), steps_per_experience
