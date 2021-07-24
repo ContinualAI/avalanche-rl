@@ -172,7 +172,7 @@ class RLBaseStrategy(BaseStrategy):
 
         return rollouts
 
-    def update(self, rollouts: List[Rollout], n_update_steps: int):
+    def update(self, rollouts: List[Rollout]):
         raise NotImplementedError(
             "`update` must be implemented by every RL strategy")
 
@@ -261,21 +261,23 @@ class RLBaseStrategy(BaseStrategy):
                 env=self.environment, n_rollouts=self.rollouts_per_step,
                 max_steps=self.max_steps_per_rollout)
             self.after_rollout(**kwargs)
+            
+            for self.update_step in range(self.updates_per_step):
+                # update must instatiate `self.loss`
+                self.update(self.rollouts)
 
-            # update must instatiate `self.loss`
-            self.update(self.rollouts, self.updates_per_step)
+                # Backward
+                self.optimizer.zero_grad()
+                self.before_backward(**kwargs)
+                self.loss.backward()
+                self.after_backward(**kwargs)
 
-            # Backward
-            self.optimizer.zero_grad()
-            self.before_backward(**kwargs)
-            self.loss.backward()
-            self.after_backward(**kwargs)
+                # Optimization step
+                self.before_update(**kwargs)
+                self.optimizer.step()
+                self.after_update(**kwargs)
 
-            # Optimization step
-            self.before_update(**kwargs)
-            self.optimizer.step()
-            self.after_update(**kwargs)
-
+            self.after_training_iteration(**kwargs)
             # periodic evaluation
             self._periodic_eval(eval_streams, do_final=False)
 

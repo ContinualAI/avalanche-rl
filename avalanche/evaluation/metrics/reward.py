@@ -77,8 +77,6 @@ class RewardPluginMetric(MovingWindowedStatsPluginMetric):
     # Train
     def after_rollout(self, strategy) -> None:
         self.update(strategy, False)
-
-    def after_update(self, strategy) -> 'MetricResult':
         return self.emit()
 
     # Eval
@@ -107,8 +105,6 @@ class EpLenghtPluginMetric(MovingWindowedStatsPluginMetric):
     # Train
     def after_rollout(self, strategy) -> None:
         self.update(strategy, False)
-
-    def after_update(self, strategy) -> 'MetricResult':
         return self.emit()
 
     # Eval
@@ -121,3 +117,44 @@ class EpLenghtPluginMetric(MovingWindowedStatsPluginMetric):
 
     def after_eval(self, strategy: 'BaseStrategy') -> 'MetricResult':
         self.reset()
+
+class ExplorationEpsilon(PluginMetric[float]):
+
+    def __init__(self):
+        super().__init__()
+
+    def __init__(self):
+        """
+        Initialize the metric
+        """
+        super().__init__()
+        # current x values for the metric curve
+        self.x_coord = 0
+        self.eps = 1.
+
+    def reset(self) -> None:
+        """
+        Reset the metric
+        """
+        self.eps = 1.
+
+    def result(self)->float:
+        return self.eps
+
+    def after_rollout(self, strategy) -> 'MetricResult':
+        self.eps = strategy.eps
+        return self.emit(strategy)
+
+    def emit(self, strategy):
+        """
+        Emit the result
+        """
+        value = self.eps
+        self.x_coord += 1 # increment x value
+        return [MetricValue(self, str(self), value,self.x_coord)]
+
+    def __str__(self):
+        """
+        Here you can specify the name of your metric
+        """
+        return "Exploration Eps"

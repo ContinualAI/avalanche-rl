@@ -121,8 +121,8 @@ class TqdmWriteInteractiveLogger(InteractiveLogger):
     def after_training_exp(self, strategy: 'BaseStrategy', metric_values: List['MetricValue'], **kwargs):
         self._end_progress()
         return super().after_training_exp(strategy, metric_values, **kwargs)
-
-    def after_update(self, strategy: 'BaseStrategy',
+    
+    def after_training_iteration(self, strategy: 'BaseStrategy',
                      metric_values: List['MetricValue'], **kwargs):
         self._progress.update()
         self._progress.refresh()

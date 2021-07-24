@@ -59,11 +59,11 @@ class A2CStrategy(RLBaseStrategy):
             _, policy_logits = self.model(observations, compute_value=False)
         # (alternative np.random.choice(num_outputs, p=np.squeeze(dist)))
         return Categorical(logits=policy_logits).sample().cpu().numpy()
-
-    def update(self, rollouts: List[Rollout], n_update_steps: int):
+    
+    def update(self, rollouts: List[Rollout]):
         # perform gradient step(s) over gathered rollouts
         self.loss = 0.
-        for rollout in rollouts[:n_update_steps]:
+        for rollout in rollouts:
             # move samples to device for processing and expect tensor of shape `timesteps`x`n_envs`xD`
             rollout = rollout.to(self.device)
             # print("Rollout Observation shape", rollout.observations.shape)

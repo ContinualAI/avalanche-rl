@@ -10,6 +10,12 @@ from torch.optim import Optimizer
 import copy
 import random
 from avalanche.training import default_rl_logger
+from avalanche.evaluation.metrics.reward import ExplorationEpsilon
+from avalanche.training.plugins.evaluation import EvaluationPlugin
+
+default_dqn_logger = EvaluationPlugin(
+    *default_rl_logger.metrics, ExplorationEpsilon(),
+    loggers=default_rl_logger.loggers)
 
 
 class DQNStrategy(RLBaseStrategy):
@@ -33,7 +39,7 @@ class DQNStrategy(RLBaseStrategy):
             discount_factor: float = 0.99,
             device='cpu',
             plugins: Optional[Sequence[StrategyPlugin]] = [],
-            eval_every: int = -1, eval_episodes: int = 1, evaluator=default_rl_logger):
+            eval_every: int = -1, eval_episodes: int = 1, evaluator=default_dqn_logger):
         super().__init__(model, optimizer, per_experience_steps,
                          criterion=criterion, rollouts_per_step=rollouts_per_step,
                          max_steps_per_rollout=max_steps_per_rollout,
@@ -41,7 +47,8 @@ class DQNStrategy(RLBaseStrategy):
                          discount_factor=discount_factor, eval_every=eval_every,
                          eval_episodes=eval_episodes, evaluator=evaluator)
         if type(target_net_update_interval) is int:
-            target_net_update_interval:Timestep = Timestep(target_net_update_interval)
+            target_net_update_interval: Timestep = Timestep(
+                target_net_update_interval)
         for exp_step in self.per_experience_steps:
             assert target_net_update_interval.unit == exp_step.unit, "You must express the target network interval using the same unit as the training lenght"
 
@@ -68,7 +75,6 @@ class DQNStrategy(RLBaseStrategy):
             fraction of the total timesteps (`exploration_fraction`).
             It will reset to `self._init_eps` on new experience.
         """
-        # TODO: log this values
         new_value = self._init_eps - experience_timestep * self.eps_decay
         self.eps = new_value if new_value > self.final_eps else self.final_eps
 
@@ -89,7 +95,8 @@ class DQNStrategy(RLBaseStrategy):
     def before_training_exp(self, **kwargs):
         # compute linear decay rate from specified fraction and specified timestep unit 
         # for this experience (supports different number of steps per experience)
-        self.eps_decay = (self._init_eps - self.final_eps) / (self.expl_fr * self.current_experience_steps.value)
+        self.eps_decay = (self._init_eps - self.final_eps) / (
+            self.expl_fr * self.current_experience_steps.value)
 
         # initialize replay memory with collected data before first experience, taking into account multiple workers
         rollouts = self.rollout(
@@ -162,27 +169,25 @@ class DQNStrategy(RLBaseStrategy):
 
         return next_q_values
 
-    def update(self, rollouts: List[Rollout], n_update_steps: int):
-        self.loss = 0.
-        for _ in range(n_update_steps):
-            # sample batch of steps/experiences from memory
-            batch = self.replay_memory.sample_batch(self.batch_dim, self.device)
+    def update(self, rollouts: List[Rollout]):
+        # sample batch of steps/experiences from memory
+        batch = self.replay_memory.sample_batch(self.batch_dim, self.device)
 
-            # compute q values prediction for whole batch: Q(s, a)
-            q_pred = self.model(batch.observations)
-            # print('obs shape', batch.observations.shape,'act', batch.actions.shape, 'q pred', q_pred.shape)
+        # compute q values prediction for whole batch: Q(s, a)
+        q_pred = self.model(batch.observations)
+        # print('obs shape', batch.observations.shape,'act', batch.actions.shape, 'q pred', q_pred.shape)
 
-            # condition on taken actions (select performed actions' q-values)
-            q_pred = torch.gather(
-                q_pred, dim=1, index=batch.actions)
+        # condition on taken actions (select performed actions' q-values)
+        q_pred = torch.gather(
+            q_pred, dim=1, index=batch.actions)
 
-            # compute target Q value: Q*(s, a) = R_t + gamma * max_{a'} Q(s', a') 
-            next_q_values = self._compute_next_q_values(batch)
-            # print('q next', next_q_values.shape, batch.rewards.shape, batch.dones.shape, 'q pred', q_pred.shape)
-            # mask terminal states only after max q value action has been selected
-            q_target = batch.rewards + self.gamma * \
-                (1 - batch.dones.int()) * next_q_values.unsqueeze(-1)
+        # compute target Q value: Q*(s, a) = R_t + gamma * max_{a'} Q(s', a') 
+        next_q_values = self._compute_next_q_values(batch)
+        # print('q next', next_q_values.shape, batch.rewards.shape, batch.dones.shape, 'q pred', q_pred.shape)
+        # mask terminal states only after max q value action has been selected
+        q_target = batch.rewards + self.gamma * \
+            (1 - batch.dones.int()) * next_q_values.unsqueeze(-1)
 
-            self.loss += self._criterion(q_pred, q_target)
+        self.loss = self._criterion(q_pred, q_target)
 
-            # TODO: gradient norm clipping?
+        # TODO: gradient norm clipping?

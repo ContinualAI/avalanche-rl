@@ -77,21 +77,21 @@ if __name__ == "__main__":
     # CartPole setting
     model = ActorCriticMLP(4, 2, 1024, 1024)
     # model = ActorCriticMLP(2, 3, 512, 512)
-    # model = MLPDeepQN(input_size=4, hidden_size=128,
-    #   n_actions=2, hidden_layers=2)
+    # model = MLPDeepQN(input_size=4, hidden_size=1024, n_actions=2, hidden_layers=2)
     print("Model", model)
-    # cl_strategy = Naive(model, optim, )
-    # strategy = RLStrategy('MlpPolicy', [scenario.envs[0]], 'dqn', None, per_experience_episodes=3, eval_mb_size=1, device=device, )
+    # DQN learning rate
+    # optimizer = Adam(model.parameters(), lr=2e-3)
+    # A2C learning rate
     optimizer = Adam(model.parameters(), lr=1e-4)
 
     strategy = A2CStrategy(
-        model, optimizer, per_experience_steps=100000, max_steps_per_rollout=5,
-        device=device, eval_every=10000, eval_episodes=100)
+        model, optimizer, per_experience_steps=10000, max_steps_per_rollout=5,
+        device=device, eval_every=1000, eval_episodes=10)
     # FIXME: dqn is too slow
     # strategy = DQNStrategy(
     # model, optimizer, 1000, batch_size=32, exploration_fraction=.2, rollouts_per_step=10,
-    # replay_memory_size=10000, updates_per_step=10, replay_memory_init_size=500, double_dqn=True,
-    # target_net_update_interval=10, polyak_update_tau=1.)
+    # replay_memory_size=10000, updates_per_step=10, replay_memory_init_size=1000, double_dqn=True,
+    # target_net_update_interval=10, polyak_update_tau=1., eval_every=100, eval_episodes=10)
 
     # TRAINING LOOP
     print('Starting experiment...')
