@@ -3,18 +3,14 @@ import torch
 import torch.nn.functional as F
 from .simple_mlp import SimpleMLP
 
-class MLPDeepQN(SimpleMLP):
-    """
-    Simple Action-Value MLP for DQN.
-    """
 
-    def __init__(
-            self, input_size: int, hidden_size: int, n_actions: int,
-            hidden_layers: int = 1):
-        # it does use dropout
-        super().__init__(num_classes=n_actions, input_size=input_size,
-                         hidden_size=hidden_size, hidden_layers=hidden_layers, dropout=False)
-                         
+class DQNModel(nn.Module):
+
+    def __init__(self):
+        super().__init__()
+
+    def forward(x: torch.Tensor):
+        raise NotImplementedError()
 
     @torch.no_grad()
     def get_action(self, observation: torch.Tensor):
@@ -22,7 +18,26 @@ class MLPDeepQN(SimpleMLP):
         return torch.argmax(q_values, dim=1).cpu().int().numpy()
 
 
-class ConvDeepQN(nn.Module):
+class MLPDeepQN(DQNModel):
+    """
+    Simple Action-Value MLP for DQN.
+    """
+
+    def __init__(
+            self, input_size: int, hidden_size: int, n_actions: int,
+            hidden_layers: int = 1):
+        super().__init__()
+        # it does use dropout
+        self.dqn = SimpleMLP(
+            num_classes=n_actions, input_size=input_size,
+            hidden_size=hidden_size, hidden_layers=hidden_layers, dropout=False)
+    
+    def forward(self, x: torch.Tensor):
+        return self.dqn(x)
+        
+
+
+class ConvDeepQN(DQNModel):
     # network architecture from Mnih et al 2015 - "Human-level Control Through Deep Reinforcement Learning"
     def __init__(self, input_channels, image_shape, n_actions, batch_norm=False):
         super(ConvDeepQN, self).__init__()
@@ -58,10 +73,3 @@ class ConvDeepQN(nn.Module):
             x = self.conv3(x)
         print("Size of flattened input to fully connected layer:", x.flatten().shape)
         return x.squeeze(0).flatten().shape[0]
-
-    # FIXME: inherit
-    @torch.no_grad()
-    def get_action(self, observation: torch.Tensor):
-        q_values = self(observation)
-        return torch.argmax(q_values, dim=1).cpu().int().numpy()
-

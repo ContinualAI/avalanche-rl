@@ -133,6 +133,8 @@ if importlib.util.find_spec('continual_habitat_lab') is not None and importlib.u
 
         # instatiate RLScenario from a given lab configuration
         env = ContinualHabitatEnv(cl_habitat_lab_config)
+        # TODO: add plugin wrappers
+
         # TODO: evaluating on same env changes its state, must have some evaluation mode
         # if eval_config is None:
             # eval_env = env

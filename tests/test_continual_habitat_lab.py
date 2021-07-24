@@ -11,7 +11,7 @@ def make_cfg(max_steps = 100, res=(128, 128), task_iterator_max_eps=None):
         }, 
         'agent': {
             'sensor_specifications': [{
-                'type': "RGB",
+                'type': "RGBA",
                 'resolution': res
             }]
         }
@@ -39,9 +39,9 @@ def test_reset():
     scenario, steps_per_exps = habitat_benchmark_generator(cfg, max_steps_per_experience=100)
     env = scenario.envs[0] 
     obs = env.reset()
-    assert 'rgb' in obs 
-    # RGBA format
-    assert obs['rgb'].shape == (*resolution, 4)
+    assert 'rgba' in obs 
+    # RGBA shape
+    assert obs['rgba'].shape == (*resolution, 4)
 
     scenario.envs[0].close()
 
