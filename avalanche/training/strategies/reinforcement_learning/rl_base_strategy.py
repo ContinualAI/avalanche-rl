@@ -301,7 +301,7 @@ class RLBaseStrategy(BaseStrategy):
             self.timestep,
             self.experience,
             self.environment,
-            # self.dataloader,
+            self.n_envs,
             self.is_training)
 
         if (self.eval_every == 0 and do_final) or \
@@ -311,7 +311,7 @@ class RLBaseStrategy(BaseStrategy):
 
         # restore train-state variables and training mode.
         self.timestep, self.experience, self.environment = _prev_state[:3]
-        # self.dataloader = _prev_state[3]
+        self.n_envs = _prev_state[3]
         self.is_training = _prev_state[3]
         self.model.train()
 

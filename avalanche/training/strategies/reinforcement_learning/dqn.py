@@ -107,6 +107,9 @@ class DQNStrategy(RLBaseStrategy):
                 size=self.replay_size, n_envs=self.n_envs)
 
         self.replay_memory.add_rollouts(rollouts)
+
+        # adjust number of rollouts per step in order to assign equal load to each parallel actor
+        self.rollouts_per_step = self.rollouts_per_step // self.n_envs
         return super().before_training_exp()
 
     def before_rollout(self, **kwargs):

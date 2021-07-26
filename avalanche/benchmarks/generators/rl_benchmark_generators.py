@@ -1,41 +1,73 @@
+from collections import defaultdict
+from gym.core import Wrapper
 from avalanche.benchmarks.rl_benchmark import *
 import gym
 from gym import envs
 from typing import *
 import numpy as np
 import importlib.util
+from gym.wrappers.atari_preprocessing import AtariPreprocessing
+from avalanche.training.strategies.reinforcement_learning.utils import FrameStackingWrapper
+import random
 
 
 def get_all_envs_id():
+    return envs.registry.env_specs.keys()
+
+
+def get_all_atari_envs_id():
     all_envs = envs.registry.all()
-    return [env_spec.id for env_spec in all_envs]
+    return [env_spec.id for env_spec in all_envs if 'atari' in env_spec.entry_point]
 
 
-def make_env(env_name: str, env_kwargs: Dict[Any, Any] = dict()):
-    return gym.make(env_name, **env_kwargs)
+def make_env(
+        env_name: str, env_kwargs: Dict[Any, Any] = dict(),
+        wrappers: Wrapper = None):
+    env = gym.make(env_name, **env_kwargs)
+    print('make env wrappers', wrappers)
+    if wrappers is not None:
+        for wrapper in wrappers:
+            env = wrapper(env)
+    return env
 
 
 def gym_benchmark_generator(
         env_names: List[str] = [],
         environments: List[gym.Env] = [],
         n_random_envs: int = None, 
-        env_kwargs: Dict[str, Dict[Any, Any]] = {},
+        env_kwargs: Dict[str, Dict[Any, Any]] = dict(),
         n_parallel_envs: int = 1,
         eval_envs: Union[List[str], List[gym.Env]] = None,
         n_experiences=None,
+        env_wrappers: Union[Wrapper, List[Wrapper], Dict[str, List[Wrapper]]] = dict(),
         envs_ids_to_sample_from: List[str] = None, *args, **kwargs) -> RLScenario:
+
+    # if one or more wrapper are passed without spefic key, use that for every environment
+    if isinstance(env_wrappers, type):
+        wrappers: Dict[str, List[Wrapper]] = defaultdict(lambda: [env_wrappers])
+    elif type(env_wrappers) is list:
+        wrappers: Dict[str, List[Wrapper]] = defaultdict(lambda: env_wrappers)
+    elif type(env_wrappers) is dict:
+        wrappers: Dict[str, List[Wrapper]] = env_wrappers
+
     # three ways to create environments from gym
     if env_names is not None and len(env_names):
-        envs_ = [gym.make(ename, **env_kwargs.get(ename, {}))
-                 for ename in env_names]
+        envs_ = [
+                 make_env(
+                     ename, env_kwargs.get(ename, dict()),
+                     wrappers[ename]) for ename in env_names]
     elif environments is not None and len(environments):
+        # no wrapping if environments are passed explicitely
         envs_ = environments
     elif n_random_envs is not None and n_random_envs > 0:
         # choose `n_envs` random envs either from the registered ones or from the provided ones
         to_choose = get_all_envs_id(
         ) if envs_ids_to_sample_from is not None else envs_ids_to_sample_from
-        ids = np.random.choice(to_choose, n_random_envs)  
-        envs_ = [gym.make(ename, **env_kwargs.get(ename, {})) for ename in ids]
+        ids = random.sample(to_choose, n_random_envs)  
+        envs_ = [
+            make_env(
+                ename, env_kwargs.get(ename, {}),
+                wrappers[ename]) for ename in ids]
     else:
         raise ValueError(
             'You must provide at least one argument among `env_names`,`environments`, `n_random_envs`!')
@@ -44,8 +76,10 @@ def gym_benchmark_generator(
     if eval_envs is None:
         eval_envs = envs_
     elif len(eval_envs) and type(eval_envs[0]) is str:
-        eval_envs = [gym.make(ename, **env_kwargs.get(ename, {}))
-                     for ename in eval_envs]
+        eval_envs = [
+            make_env(
+                ename, env_kwargs.get(ename, {}),
+                wrappers[ename]) for ename in eval_envs]
         # TODO: delayed feature
         # if a list of env names is provided, we don't build the enviornment until actual evaluation occurs
         # eval_envs = [
@@ -66,9 +100,29 @@ def gym_benchmark_generator(
         n_parallel_envs=n_parallel_envs, eval_envs=eval_envs, *args, **kwargs)
 
 
-def atari_benchmark_generator() -> RLScenario:
-    # TODO: setup env wrappers
-    pass
+def atari_benchmark_generator(
+        env_names: List[str] = [],
+        n_random_envs: int = None, n_parallel_envs: int = 1,
+        eval_envs: Union[List[str], List[gym.Env]] = None, n_experiences=None,
+        frame_stacking: bool = True, 
+        normalize_observations: bool=False,
+        extra_wrappers: List[Wrapper] = [],
+        *args, **kwargs) -> RLScenario:
+    # setup atari specific env wrappers
+    wrappers = [lambda env: AtariPreprocessing(env=env, scale_obs=normalize_observations)]
+    if frame_stacking:
+        # TODO: consider https://github.com/openai/gym/blob/master/gym/wrappers/frame_stack.py
+        from gym.wrappers.frame_stack import FrameStack
+        wrappers.append(FrameStackingWrapper)
+        # wrappers.append(lambda env: FrameStack(env, num_stack=4))
+    wrappers.extend(extra_wrappers)
+    # get atari id if we need to sample randomly
+    atari_ids = get_all_atari_envs_id() if n_random_envs is not None else None
+
+    return gym_benchmark_generator(
+        env_names, n_random_envs=n_random_envs, n_parallel_envs=n_parallel_envs,
+        eval_envs=eval_envs, n_experiences=n_experiences, env_wrappers=wrappers,
+        envs_ids_to_sample_from=atari_ids, *args, **kwargs)
 
 
 # check AvalancheLab extra dependency
@@ -100,8 +154,10 @@ if importlib.util.find_spec('continual_habitat_lab') is not None and importlib.u
 
         # compute number of steps per experience
         steps_per_experience = Timestep(max_steps_per_experience)
-        task_len_in_episodes = cl_habitat_lab_config.task_iterator.get('max_task_repeat_episodes', -1)
-        task_len_in_steps = cl_habitat_lab_config.task_iterator.get('max_task_repeat_steps', -1)
+        task_len_in_episodes = cl_habitat_lab_config.task_iterator.get(
+            'max_task_repeat_episodes', -1)
+        task_len_in_steps = cl_habitat_lab_config.task_iterator.get(
+            'max_task_repeat_steps', -1)
 
         if task_len_in_episodes > 0:
             steps_per_experience = Timestep(
@@ -137,7 +193,7 @@ if importlib.util.find_spec('continual_habitat_lab') is not None and importlib.u
 
         # TODO: evaluating on same env changes its state, must have some evaluation mode
         # if eval_config is None:
-            # eval_env = env
+        # eval_env = env
 
         # also return computed number of steps per experience
         # NOTE: parallel_env only supported on distributed settings due to opengl lock

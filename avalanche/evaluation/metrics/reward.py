@@ -74,6 +74,11 @@ class RewardPluginMetric(MovingWindowedStatsPluginMetric):
         rewards = strategy.eval_rewards if is_eval else strategy.rewards 
         for return_ in rewards['past_returns']:
             self._moving_window.update(return_)
+
+    def before_training_exp(self, strategy: 'BaseStrategy') -> 'MetricResult':
+        # reset on new experience
+        self.reset()
+
     # Train
     def after_rollout(self, strategy) -> None:
         self.update(strategy, False)
@@ -102,6 +107,11 @@ class EpLenghtPluginMetric(MovingWindowedStatsPluginMetric):
         for _, ep_lengths in lengths.items():
             for ep_len in ep_lengths: 
                 self._moving_window.update(ep_len)
+
+    def before_training_exp(self, strategy: 'BaseStrategy') -> 'MetricResult':
+        # reset on new experience
+        self.reset()
+        
     # Train
     def after_rollout(self, strategy) -> None:
         self.update(strategy, False)
@@ -118,6 +128,7 @@ class EpLenghtPluginMetric(MovingWindowedStatsPluginMetric):
     def after_eval(self, strategy: 'BaseStrategy') -> 'MetricResult':
         self.reset()
 
+# TODO: make general for any kind of float metric
 class ExplorationEpsilon(PluginMetric[float]):
 
     def __init__(self):

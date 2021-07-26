@@ -44,16 +44,16 @@ class CropObservationWrapper(ObservationWrapper):
 class FrameStackingWrapper(ObservationWrapper):
     """"Wrapper for image stacking"""
 
-    def __init__(self, env, n_steps=4, resolution=(84, 84), dtype=np.float32):
+    def __init__(self, env, n_steps=4):
         super(FrameStackingWrapper, self).__init__(env)
-        self.dtype = dtype
         self.buffer = None
         old_space = env.observation_space
+        self.dtype = old_space.dtype
         self.observation_space = gym.spaces.Box(
-            low=0.0 if dtype==np.float32 else 0,
-            high=1.0 if dtype==np.float32 else 255,
-            shape=(n_steps, *resolution),
-            dtype=dtype,
+            low=old_space.low.min(),
+            high=old_space.high.max(),
+            shape=(n_steps, *old_space.shape),
+            dtype=self.dtype,
         )
 
     def reset(self):
@@ -65,7 +65,8 @@ class FrameStackingWrapper(ObservationWrapper):
         """convert observation"""
         self.buffer[:-1] = self.buffer[1:]
         self.buffer[-1] = observation
-        return self.buffer
+        # return a copy of current buffer
+        return self.buffer.copy()
 
 class Array2Tensor(ObservationWrapper):
 

@@ -68,30 +68,30 @@ if __name__ == "__main__":
     # device = torch.device('cuda:0')
 
     # FIXME: multi env is still bugged, single env works just fine
-    # works well if you use VectorizedEnv with 1 parallel env tho..
+    # works well if you use VectorizedEnv with 1 parallel env tho..it works with dqn too!
     scenario = gym_benchmark_generator(
         ['CartPole-v1'],
-        n_parallel_envs=1, eval_envs=['CartPole-v1'])
+        n_parallel_envs=8, eval_envs=['CartPole-v1'])
     # scenario = gym_benchmark_generator(['MountainCar-v0'], n_parallel_envs=1)
 
     # CartPole setting
-    model = ActorCriticMLP(4, 2, 1024, 1024)
+    # model = ActorCriticMLP(4, 2, 1024, 1024)
     # model = ActorCriticMLP(2, 3, 512, 512)
-    # model = MLPDeepQN(input_size=4, hidden_size=1024, n_actions=2, hidden_layers=2)
+    model = MLPDeepQN(input_size=4, hidden_size=1024, n_actions=2, hidden_layers=2)
     print("Model", model)
     # DQN learning rate
-    # optimizer = Adam(model.parameters(), lr=2e-3)
+    optimizer = Adam(model.parameters(), lr=2e-3)
     # A2C learning rate
-    optimizer = Adam(model.parameters(), lr=1e-4)
+    # optimizer = Adam(model.parameters(), lr=1e-4)
 
-    strategy = A2CStrategy(
-        model, optimizer, per_experience_steps=10000, max_steps_per_rollout=5,
-        device=device, eval_every=1000, eval_episodes=10)
+    # strategy = A2CStrategy(
+        # model, optimizer, per_experience_steps=10000, max_steps_per_rollout=5,
+        # device=device, eval_every=1000, eval_episodes=10)
     # FIXME: dqn is too slow
-    # strategy = DQNStrategy(
-    # model, optimizer, 1000, batch_size=32, exploration_fraction=.2, rollouts_per_step=10,
-    # replay_memory_size=10000, updates_per_step=10, replay_memory_init_size=1000, double_dqn=True,
-    # target_net_update_interval=10, polyak_update_tau=1., eval_every=100, eval_episodes=10)
+    strategy = DQNStrategy(
+    model, optimizer, 1000, batch_size=32, exploration_fraction=.2, rollouts_per_step=10,
+    replay_memory_size=10000, updates_per_step=10, replay_memory_init_size=1000, double_dqn=True,
+    target_net_update_interval=10, polyak_update_tau=1., eval_every=100, eval_episodes=10)
 
     # TRAINING LOOP
     print('Starting experiment...')
