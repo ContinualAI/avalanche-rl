@@ -337,6 +337,7 @@ class RLBaseStrategy(BaseStrategy):
 
         self.before_eval(*kwargs)
         for self.experience in exp_list:
+            # FIXME: is this wrapped multiple times cause of same reference??
             self.environment = self.experience.environment
             # only single env supported during evaluation
             self.n_envs = self.experience.n_envs
@@ -368,14 +369,16 @@ class RLBaseStrategy(BaseStrategy):
 
         for ep_no in range(self.eval_episodes):
             obs = self.environment.reset()
-            done = False
-            t = 0
-            while not done:
+            for t in count():
+                # this may get stuck with games such as breakout and deterministic dqn
+                # if we let no op action be selected indefinitely 
                 action = self.model.get_action(obs.unsqueeze(0).to(self.device))
                 obs, reward, done, info = self.environment.step(action.item())
                 # TODO: use info
                 self.eval_rewards['past_returns'][ep_no] += reward
-                t += 1
+                if done:
+                    break
+                
             self.eval_ep_lengths[0].append(t)
 
         # needed if env comes from train stream and is thus shared

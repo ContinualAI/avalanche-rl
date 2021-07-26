@@ -7,6 +7,7 @@ from typing import Tuple, Union, Dict, Any
 
 # Env wrappers adapted from pytorch lighting bolts
 
+
 class RGB2GrayWrapper(ObservationWrapper):
     def __init__(self, env):
         super(RGB2GrayWrapper, self).__init__(env)
@@ -24,6 +25,7 @@ class RGB2GrayWrapper(ObservationWrapper):
         # single channel uint8 conversion
         return cv2.cvtColor(obs, cv2.COLOR_RGB2GRAY)
 
+
 class CropObservationWrapper(ObservationWrapper):
     def __init__(self, env, resize_shape=(84, 84)):
         super(CropObservationWrapper, self).__init__(env)
@@ -38,7 +40,6 @@ class CropObservationWrapper(ObservationWrapper):
 
     def observation(self, obs):
         return cv2.resize(obs, self.resize_shape, interpolation=cv2.INTER_AREA)
-
 
 
 class FrameStackingWrapper(ObservationWrapper):
@@ -58,7 +59,8 @@ class FrameStackingWrapper(ObservationWrapper):
 
     def reset(self):
         """reset env"""
-        self.buffer = np.zeros_like(self.observation_space.low, dtype=self.dtype)
+        self.buffer = np.zeros_like(
+            self.observation_space.low, dtype=self.dtype)
         return self.observation(self.env.reset())
 
     def observation(self, observation):
@@ -67,6 +69,7 @@ class FrameStackingWrapper(ObservationWrapper):
         self.buffer[-1] = observation
         # return a copy of current buffer
         return self.buffer.copy()
+
 
 class Array2Tensor(ObservationWrapper):
 
@@ -79,11 +82,40 @@ class Array2Tensor(ObservationWrapper):
         return t
 
 
+class FireResetEnv(gym.Wrapper):
+    """
+    Adapated from https://github.com/DLR-RM/stable-baselines3/blob/master/stable_baselines3/common/atari_wrappers.py.
+    Take action on reset for environments that are fixed until firing.
+
+    :param env: the environment to wrap
+    """
+
+    def __init__(self, env: gym.Env):
+        super().__init__(env)
+        # assert env.unwrapped.get_action_meanings()[1] == "FIRE"
+        # assert len(env.unwrapped.get_action_meanings()) >= 3
+
+    def reset(self, **kwargs) -> np.ndarray:
+        action_keys = self.env.unwrapped.get_action_meanings()
+        if "FIRE" in action_keys and len(action_keys) >= 3:
+            self.env.reset(**kwargs)
+            obs, _, done, _ = self.env.step(1)
+            if done:
+                self.env.reset(**kwargs)
+            obs, _, done, _ = self.env.step(2)
+            if done:
+                self.env.reset(**kwargs)
+            return obs
+        else:
+            return super().reset(**kwargs)
+
+
 class VectorizedEnvWrapper(Wrapper):
     """ 
     Wraps a single environment maintaining the interface of vectorized environment 
     with none of the overhead involved by running parallel environments.  
     """
+
     def __init__(self, env: gym.Env, auto_reset: bool = True) -> None:
         super().__init__(env)
         self.auto_reset = auto_reset
@@ -108,7 +140,7 @@ class VectorizedEnvWrapper(Wrapper):
             obs = self.reset()
 
         obs = self._unsqueeze_obs(obs)
-        
+
         return obs, reward, done, info
 
     def reset(self) -> Any:

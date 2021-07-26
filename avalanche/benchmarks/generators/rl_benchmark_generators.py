@@ -7,7 +7,7 @@ from typing import *
 import numpy as np
 import importlib.util
 from gym.wrappers.atari_preprocessing import AtariPreprocessing
-from avalanche.training.strategies.reinforcement_learning.utils import FrameStackingWrapper
+from avalanche.training.strategies.reinforcement_learning.utils import FireResetEnv, FrameStackingWrapper
 import random
 
 
@@ -39,10 +39,11 @@ def gym_benchmark_generator(
         n_parallel_envs: int = 1,
         eval_envs: Union[List[str], List[gym.Env]] = None,
         n_experiences=None,
-        env_wrappers: Union[Wrapper, List[Wrapper], Dict[str, List[Wrapper]]] = dict(),
+        env_wrappers: Union[Wrapper, List[Wrapper], Dict[str, List[Wrapper]]] = None,
         envs_ids_to_sample_from: List[str] = None, *args, **kwargs) -> RLScenario:
 
     # if one or more wrapper are passed without spefic key, use that for every environment
+    wrappers = defaultdict(list)
     if isinstance(env_wrappers, type):
         wrappers: Dict[str, List[Wrapper]] = defaultdict(lambda: [env_wrappers])
     elif type(env_wrappers) is list:
@@ -109,7 +110,7 @@ def atari_benchmark_generator(
         extra_wrappers: List[Wrapper] = [],
         *args, **kwargs) -> RLScenario:
     # setup atari specific env wrappers
-    wrappers = [lambda env: AtariPreprocessing(env=env, scale_obs=normalize_observations)]
+    wrappers = [lambda env: AtariPreprocessing(env=env, scale_obs=normalize_observations), FireResetEnv]
     if frame_stacking:
         # TODO: consider https://github.com/openai/gym/blob/master/gym/wrappers/frame_stack.py
         from gym.wrappers.frame_stack import FrameStack

@@ -39,6 +39,7 @@ class DQNStrategy(RLBaseStrategy):
             discount_factor: float = 0.99,
             device='cpu',
             plugins: Optional[Sequence[StrategyPlugin]] = [],
+            reset_replay_on_new_experience: bool=True,
             eval_every: int = -1, eval_episodes: int = 1, evaluator=default_dqn_logger):
         super().__init__(model, optimizer, per_experience_steps,
                          criterion=criterion, rollouts_per_step=rollouts_per_step,
@@ -59,6 +60,7 @@ class DQNStrategy(RLBaseStrategy):
         self.double_dqn = double_dqn
         self.target_net_update_interval: Timestep = target_net_update_interval
         self.polyak_update_tau = polyak_update_tau
+        self.reset_replay = reset_replay_on_new_experience
         assert initial_epsilon >= final_epsilon, "Initial epsilon value must be greater or equal than final one"
 
         self._init_eps = initial_epsilon
@@ -68,6 +70,7 @@ class DQNStrategy(RLBaseStrategy):
 
         # initialize target network
         self.target_net = copy.deepcopy(self.model)
+        self.target_net = self.target_net.to(self.device)
 
     def _update_epsilon(self, experience_timestep: int):
         """
@@ -111,6 +114,11 @@ class DQNStrategy(RLBaseStrategy):
         # adjust number of rollouts per step in order to assign equal load to each parallel actor
         self.rollouts_per_step = self.rollouts_per_step // self.n_envs
         return super().before_training_exp()
+
+    def after_training_exp(self, **kwargs):
+        if self.reset_replay:
+            self.replay_memory = None
+        return super().after_training_exp(**kwargs)
 
     def before_rollout(self, **kwargs):
         # update exploration rate
