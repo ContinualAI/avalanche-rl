@@ -41,9 +41,13 @@ class MovingWindowedStatsPluginMetric(PluginMetric[List[float]]):
             if 'mean' == stat:
                 values.append(self._moving_window.result())
             if 'max' == stat:
-                values.append(np.amax(self._moving_window.window, initial=np.float('-inf')))
+                values.append(
+                    np.amax(
+                        self._moving_window.window, initial=np.float('-inf')))
             if 'min' == stat:
-                values.append(np.amin(self._moving_window.window, initial=np.float('-inf')))
+                values.append(
+                    np.amin(
+                        self._moving_window.window, initial=np.float('-inf')))
             if 'std' == stat:
                 if len(self._moving_window.window):
                     values.append(np.std(self._moving_window.window))
@@ -70,7 +74,7 @@ class RewardPluginMetric(MovingWindowedStatsPluginMetric):
             **kwargs):
         super().__init__(window_size, name=name, *args, **kwargs)
 
-    def update(self, strategy, is_eval:bool):
+    def update(self, strategy, is_eval: bool):
         rewards = strategy.eval_rewards if is_eval else strategy.rewards 
         for return_ in rewards['past_returns']:
             self._moving_window.update(return_)
@@ -91,7 +95,7 @@ class RewardPluginMetric(MovingWindowedStatsPluginMetric):
     def after_eval_exp(self, strategy: 'BaseStrategy') -> MetricResult:
         self.update(strategy, True)
         return self.emit()
-    
+
     def after_eval(self, strategy: 'BaseStrategy') -> 'MetricResult':
         self.reset()
 
@@ -101,7 +105,7 @@ class EpLenghtPluginMetric(MovingWindowedStatsPluginMetric):
     def __init__(self, window_size: int, name: str = 'Episode Length', *args, **kwargs):
         super().__init__(window_size, name=name, *args, **kwargs)
 
-    def update(self, strategy, is_eval:bool):
+    def update(self, strategy, is_eval: bool):
         # iterate over parallel envs episodes
         lengths = strategy.eval_ep_lengths if is_eval else strategy.ep_lengths 
         for _, ep_lengths in lengths.items():
@@ -111,7 +115,7 @@ class EpLenghtPluginMetric(MovingWindowedStatsPluginMetric):
     def before_training_exp(self, strategy: 'BaseStrategy') -> 'MetricResult':
         # reset on new experience
         self.reset()
-        
+
     # Train
     def after_rollout(self, strategy) -> None:
         self.update(strategy, False)
@@ -129,43 +133,51 @@ class EpLenghtPluginMetric(MovingWindowedStatsPluginMetric):
         self.reset()
 
 # TODO: make general for any kind of float metric
-class ExplorationEpsilon(PluginMetric[float]):
 
-    def __init__(self):
-        super().__init__()
 
-    def __init__(self):
-        """
-        Initialize the metric
-        """
+class GenericFloatMetric(PluginMetric[float]):
+    # Logs output of a simple float value without many bells and whistles 
+
+    def __init__(self, metric_variable_name: str, name: str,
+                 reset_value: float = None, emit_on=['after_rollout'], update_on=['after_rollout']):
         super().__init__()
-        # current x values for the metric curve
+        self.metric_name = metric_variable_name
+        self.name = name
+        self.reset_val = reset_value
+        self.init_val = None
         self.x_coord = 0
-        self.eps = 1.
+        self.metric_value = None
+
+        # define callbacks
+        for update_call in update_on:
+            setattr(self, update_call, lambda strat: self._update(strat))
+        for emit_call in emit_on:
+            foo = getattr(self, emit_call)
+            setattr(self, update_call, lambda strat:[f(strat) for f in [foo, lambda s: self._emit(s)]][-1])
 
     def reset(self) -> None:
         """
         Reset the metric
         """
-        self.eps = 1.
+        if self.reset_val is None:
+            self.metric_value = self.init_val
+        else:
+            self.metric_value = self.reset_val
 
-    def result(self)->float:
-        return self.eps
+    def result(self) -> float:
+        return self.metric_value
 
-    def after_rollout(self, strategy) -> 'MetricResult':
-        self.eps = strategy.eps
-        return self.emit(strategy)
+    def _update(self, strategy):
+        self.metric_value = getattr(strategy, self.metric_name)
+        if self.init_val is None:
+            self.init_val = self.metric_value
 
-    def emit(self, strategy):
+    def _emit(self, strategy):
         """
         Emit the result
         """
-        value = self.eps
-        self.x_coord += 1 # increment x value
-        return [MetricValue(self, str(self), value,self.x_coord)]
+        self.x_coord += 1
+        return [MetricValue(self, str(self), self.metric_value, self.x_coord)]
 
     def __str__(self):
-        """
-        Here you can specify the name of your metric
-        """
-        return "Exploration Eps"
+        return self.name

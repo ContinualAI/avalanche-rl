@@ -378,7 +378,7 @@ class RLBaseStrategy(BaseStrategy):
                 self.eval_rewards['past_returns'][ep_no] += reward
                 if done:
                     break
-                
+
             self.eval_ep_lengths[0].append(t)
 
         # needed if env comes from train stream and is thus shared

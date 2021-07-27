@@ -91,16 +91,18 @@ class VectorizedEnvironment(object):
         if isinstance(envs, types.FunctionType):
             # each env will be copied over to shared memory if the object is provided
             self.env = envs(**env_kwargs)
+            # FIXME: this is probably why a2c didnt work, ref to same object
             envs = [envs] * self.n_envs
         elif isinstance(envs, gym.Env):
+            from copy import deepcopy
             self.env = envs
-            envs = [envs for _ in range(self.n_envs)]
+            envs = [deepcopy(envs) for _ in range(self.n_envs)]
         elif type(envs) is list:
             assert len(envs) == n_envs
             self.env = envs[0]
             # envs = [lambda _ : envs[i] for i in range(n_envs)]
 
-        # ray actor pool?
+        # envs = [gym.make('PongNoFrameskip-v4') for _ in range(n_envs)]
         self.actors = [Actor.remote(
                            envs[i],
                            i, env_kwargs, auto_reset=auto_reset)

@@ -3,17 +3,23 @@ from avalanche.benchmarks.scenarios.generic_cl_scenario import TGenericScenarioS
 from gym.core import Env
 from typing import Callable, Dict, Union, Optional, Sequence, Any, List
 import random
+import numpy as np
+import torch
 
 
 def rl_experience_factory(
         stream: GenericScenarioStream, exp_idx:
         Union[int, slice, Iterable[int]]) -> 'RLExperience':
-    if stream.name ==  'train':
+    if stream.name == 'train':
         # supports even a different number of parallel envs per experience 
-        return RLExperience(stream, exp_idx, stream.scenario.envs[exp_idx], stream.scenario.n_envs[exp_idx])
-    elif stream.name ==  'test':
+        return RLExperience(
+            stream, exp_idx, stream.scenario.envs[exp_idx],
+            stream.scenario.n_envs[exp_idx])
+    elif stream.name == 'test':
         # only support single env
-        return RLExperience(stream, exp_idx, stream.scenario.eval_envs[exp_idx], 1)
+        return RLExperience(
+            stream, exp_idx, stream.scenario.eval_envs[exp_idx],
+            1)
 
 
 # NCScenario equivalent (which subclasses GenericCLScenario)
@@ -23,37 +29,46 @@ class RLScenario(GenericCLScenario['RLExperience']):
                  n_experiences: int,
                  n_parallel_envs: Union[int, List[int]],
                  eval_envs: Union[List[Env], List[Callable[[], Env]]],
-                 task_labels: bool=True,
+                 task_labels: bool = True,
                  shuffle: bool = False, 
-                 seed: Optional[int] = None,
-                 fixed_task_order: Optional[Sequence[int]] = None,
-                 class_ids_from_zero_from_first_exp: bool = False,
-                 class_ids_from_zero_in_each_exp: bool = False,
-                 reproducibility_data: Optional[Dict[str, Any]] = None):
+                 seed: Optional[int] = None):
 
         assert n_experiences > 0, "Number of experiences must be a positive integer"
         if type(n_parallel_envs) is int:
             n_parallel_envs = [n_parallel_envs] * n_experiences
-        assert all([n>0 for n in n_parallel_envs]), "Number of parallel environments must be a positive integer"
+        assert all([n > 0 for n in n_parallel_envs]
+                   ), "Number of parallel environments must be a positive integer"
         self.envs = envs
         self.n_envs = n_parallel_envs
+        self.train_task_labels = list(range(len(envs)))
+        self.eval_task_labels = list(range(len(eval_envs)))
+
         if n_experiences < len(self.envs):
             self.envs = self.envs[:n_experiences]
+            self.train_task_labels = self.train_task_labels[:n_experiences]
         elif n_experiences > len(self.envs):
             # cycle through envs sequentially, referencing same object
             for i in range(n_experiences - len(self.envs)):
                 self.envs.append(self.envs[i % len(self.envs)])
-        
+                self.train_task_labels.append(
+                    self.train_task_labels[i % len(self.train_task_labels)])
+
+        if seed is not None:
+            random.seed(seed)
+            np.random.seed(seed)
+            torch.manual_seed(seed)
+
         if shuffle:
             perm = random.shuffle(list(range(len(self.envs))))
             self.envs = [self.envs[i] for i in perm]
-        
-        self.eval_envs = eval_envs
+            self.train_task_labels = [self.train_task_labels[i] for i in perm]
 
-        # ignore labels for now
+        self.eval_envs = eval_envs
+        self.train_task_labels = self.train_task_labels if task_labels else [
+            0 for _ in range(len(self.train_task_labels))]
         stream_definitions = {
-            'train': (self.envs, 0, None),
-            'test': (self.eval_envs, 0, None)
+            'train': (self.envs, self.train_task_labels, None),
+            'test': (self.eval_envs, self.eval_task_labels, None)
         }
         super().__init__(stream_definitions=stream_definitions,
                          complete_test_set_only=False,
@@ -174,10 +189,12 @@ class RLExperience(GenericExperience[RLScenario,
     stream from which this experience was taken.
     """
 
-    def __init__(self,
-                 origin_stream: GenericScenarioStream[
-                     'RLExperience', RLScenario],
-                 current_experience: int, env: Union[Env, Callable[[], Env]], n_envs: int):
+    def __init__(
+            self,
+            origin_stream: GenericScenarioStream['RLExperience', RLScenario],
+            current_experience: int, env: Union[Env, Callable[[],
+                                                              Env]],
+            n_envs: int):
         """
         Creates a ``NCExperience`` instance given the stream from this
         experience was taken and and the current experience ID.
@@ -186,7 +203,7 @@ class RLExperience(GenericExperience[RLScenario,
             obtained.
         :param current_experience: The current experience ID, as an integer.
         """
-        super(RLExperience, self).__init__(origin_stream, current_experience)
+        super().__init__(origin_stream, current_experience)
         self.env = env
         self.n_envs = n_envs
 
@@ -197,28 +214,7 @@ class RLExperience(GenericExperience[RLScenario,
             # assume it's callable
             return self.env()
         return self.env
-    
-    # FIXME: can't be None
+
     @property
     def task_labels(self) -> List[int]:
-        return [0]
-
-if __name__ == "__main__":
-    # create scenario
-    import gym
-    env = gym.make('CartPole-v1')
-    # FIXME: you can pass single env but have multiple tasks (n_experiences), 
-    # should at least return same env. To handle by higher level AtariGenerator
-    rl_scenario = RLScenario([env], n_experiences=2, task_labels=True)
-    print(rl_scenario.n_experiences)
-    print(rl_scenario.original_test_dataset)
-    # FIXME: works but no typing support
-    tstream = rl_scenario.train_stream
-    print(tstream, len(tstream))
-    # print(rl_scenario.classes_in_experience) no sense?
-    print('slicing', tstream[:1])
-    for exp in tstream:
-        print(exp, exp.current_experience)
-        env = exp.environment
-        obs = env.reset()
-        print(obs)
+        return [self.scenario.train_task_labels[self.current_experience]]

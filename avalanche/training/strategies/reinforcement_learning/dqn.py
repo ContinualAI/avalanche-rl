@@ -10,11 +10,14 @@ from torch.optim import Optimizer
 import copy
 import random
 from avalanche.training import default_rl_logger
-from avalanche.evaluation.metrics.reward import ExplorationEpsilon
+from avalanche.evaluation.metrics.reward import GenericFloatMetric
 from avalanche.training.plugins.evaluation import EvaluationPlugin
 
 default_dqn_logger = EvaluationPlugin(
-    *default_rl_logger.metrics, ExplorationEpsilon(),
+    *default_rl_logger.metrics,
+    GenericFloatMetric(
+        'eps', 'Exploration Eps', update_on=['after_rollout'],
+        emit_on=['after_rollout']),
     loggers=default_rl_logger.loggers)
 
 
@@ -39,7 +42,7 @@ class DQNStrategy(RLBaseStrategy):
             discount_factor: float = 0.99,
             device='cpu',
             plugins: Optional[Sequence[StrategyPlugin]] = [],
-            reset_replay_on_new_experience: bool=True,
+            reset_replay_on_new_experience: bool = True,
             eval_every: int = -1, eval_episodes: int = 1, evaluator=default_dqn_logger):
         super().__init__(model, optimizer, per_experience_steps,
                          criterion=criterion, rollouts_per_step=rollouts_per_step,

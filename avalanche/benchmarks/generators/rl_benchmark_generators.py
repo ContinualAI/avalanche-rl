@@ -24,7 +24,6 @@ def make_env(
         env_name: str, env_kwargs: Dict[Any, Any] = dict(),
         wrappers: Wrapper = None):
     env = gym.make(env_name, **env_kwargs)
-    print('make env wrappers', wrappers)
     if wrappers is not None:
         for wrapper in wrappers:
             env = wrapper(env)

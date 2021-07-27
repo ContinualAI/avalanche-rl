@@ -71,7 +71,7 @@ if __name__ == "__main__":
     # works well if you use VectorizedEnv with 1 parallel env tho..it works with dqn too!
     scenario = gym_benchmark_generator(
         ['CartPole-v1'],
-        n_parallel_envs=1, eval_envs=['CartPole-v1'])
+        n_parallel_envs=1, eval_envs=['CartPole-v1'], n_experiences=1)
     # scenario = gym_benchmark_generator(['MountainCar-v0'], n_parallel_envs=1)
 
     # CartPole setting
@@ -99,6 +99,7 @@ if __name__ == "__main__":
     for experience in scenario.train_stream:
         print("Start of experience ", experience.current_experience)
         print("Current Env ", experience.env)
+        print("Current Task", experience.task_label)
         strategy.train(experience, scenario.test_stream)
         print('Training completed')
 
