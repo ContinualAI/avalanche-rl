@@ -63,14 +63,18 @@ if __name__ == "__main__":
                 'type': "RGBA",
                 'resolution': image_resolution
             }]
-        }
+        }, 
+        # 'task_iterator': {
+            # 'max_steps'
+        # }
     }
 
     cfg = ContinualHabitatLabConfig(OmegaConf.create(config), from_cli=False)
 
-    scenario, steps_per_exps = habitat_benchmark_generator(cfg)
+    scenario, steps_per_exps = habitat_benchmark_generator(cfg, max_steps_per_experience=100000)
 
     # default actions: turn right-turn left-move forward
+    # FIXME: try with normal network not from atari
     model = ConvActorCritic(3, image_resolution, 3)
     print("Model", model)
 

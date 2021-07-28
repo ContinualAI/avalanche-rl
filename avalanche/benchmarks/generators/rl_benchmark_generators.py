@@ -7,7 +7,7 @@ from typing import *
 import numpy as np
 import importlib.util
 from gym.wrappers.atari_preprocessing import AtariPreprocessing
-from avalanche.training.strategies.reinforcement_learning.utils import FireResetEnv, FrameStackingWrapper
+from avalanche.training.strategies.reinforcement_learning.utils import ClipRewardWrapper, FireResetWrapper, FrameStackingWrapper
 import random
 
 
@@ -106,10 +106,14 @@ def atari_benchmark_generator(
         eval_envs: Union[List[str], List[gym.Env]] = None, n_experiences=None,
         frame_stacking: bool = True, 
         normalize_observations: bool=False,
+        clip_reward: bool=False,
         extra_wrappers: List[Wrapper] = [],
         *args, **kwargs) -> RLScenario:
     # setup atari specific env wrappers
-    wrappers = [lambda env: AtariPreprocessing(env=env, scale_obs=normalize_observations), FireResetEnv]
+    wrappers = [lambda env: AtariPreprocessing(env=env, scale_obs=normalize_observations), FireResetWrapper]
+    if clip_reward:
+        wrappers.append(ClipRewardWrapper)
+        
     if frame_stacking:
         # TODO: consider https://github.com/openai/gym/blob/master/gym/wrappers/frame_stack.py
         from gym.wrappers.frame_stack import FrameStack

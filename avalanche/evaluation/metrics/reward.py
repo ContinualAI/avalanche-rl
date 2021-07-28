@@ -132,8 +132,6 @@ class EpLenghtPluginMetric(MovingWindowedStatsPluginMetric):
     def after_eval(self, strategy: 'BaseStrategy') -> 'MetricResult':
         self.reset()
 
-# TODO: make general for any kind of float metric
-
 
 class GenericFloatMetric(PluginMetric[float]):
     # Logs output of a simple float value without many bells and whistles 
@@ -153,7 +151,8 @@ class GenericFloatMetric(PluginMetric[float]):
             setattr(self, update_call, lambda strat: self._update(strat))
         for emit_call in emit_on:
             foo = getattr(self, emit_call)
-            setattr(self, update_call, lambda strat:[f(strat) for f in [foo, lambda s: self._emit(s)]][-1])
+            setattr(self, update_call, lambda strat: [
+                    f(strat) for f in [foo, lambda s: self._emit(s)]][-1])
 
     def reset(self) -> None:
         """

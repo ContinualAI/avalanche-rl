@@ -38,6 +38,7 @@ class DQNStrategy(RLBaseStrategy):
             exploration_fraction: float = 0.1,
             double_dqn: bool = True,
             target_net_update_interval: Union[int, Timestep] = 10000,
+            max_grad_norm: float = None,
             polyak_update_tau: float = 1.,  # set to 1. to hard copy
             discount_factor: float = 0.99,
             device='cpu',
@@ -64,6 +65,7 @@ class DQNStrategy(RLBaseStrategy):
         self.target_net_update_interval: Timestep = target_net_update_interval
         self.polyak_update_tau = polyak_update_tau
         self.reset_replay = reset_replay_on_new_experience
+        self.max_grad_norm = max_grad_norm
         assert initial_epsilon >= final_epsilon, "Initial epsilon value must be greater or equal than final one"
 
         self._init_eps = initial_epsilon
@@ -204,4 +206,8 @@ class DQNStrategy(RLBaseStrategy):
 
         self.loss = self._criterion(q_pred, q_target)
 
-        # TODO: gradient norm clipping?
+    def after_backward(self, **kwargs):
+        # Gradient norm clipping
+        if self.max_grad_norm is not None:
+            torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.max_grad_norm)
+        return super().after_backward(**kwargs)

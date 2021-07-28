@@ -43,5 +43,6 @@ if __name__ == "__main__":
                     action = i
             if action is not None:
                 obs, _, done, _ = env.step(action)
-            env.render()
+            obs = env.render('rgb_array')
+            # print(obs.shape)
     cv2.destroyAllWindows()

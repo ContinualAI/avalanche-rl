@@ -67,8 +67,6 @@ if __name__ == "__main__":
     device = torch.device('cpu')
     # device = torch.device('cuda:0')
 
-    # FIXME: multi env is still bugged, single env works just fine
-    # works well if you use VectorizedEnv with 1 parallel env tho..it works with dqn too!
     scenario = gym_benchmark_generator(
         ['CartPole-v1'],
         n_parallel_envs=1, eval_envs=['CartPole-v1'], n_experiences=1)
@@ -91,7 +89,8 @@ if __name__ == "__main__":
     # strategy = DQNStrategy(
     # model, optimizer, 1000, batch_size=32, exploration_fraction=.2, rollouts_per_step=10,
     # replay_memory_size=10000, updates_per_step=10, replay_memory_init_size=1000, double_dqn=True,
-    # target_net_update_interval=10, polyak_update_tau=1., eval_every=100, eval_episodes=10, device=device)
+    # target_net_update_interval=10, polyak_update_tau=1., eval_every=100, eval_episodes=10, 
+    # device=device, max_grad_norm=None)
 
     # TRAINING LOOP
     print('Starting experiment...')

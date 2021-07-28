@@ -82,7 +82,7 @@ class Array2Tensor(ObservationWrapper):
         return t
 
 
-class FireResetEnv(gym.Wrapper):
+class FireResetWrapper(gym.Wrapper):
     """
     Adapated from https://github.com/DLR-RM/stable-baselines3/blob/master/stable_baselines3/common/atari_wrappers.py.
     Take action on reset for environments that are fixed until firing.
@@ -108,6 +108,17 @@ class FireResetEnv(gym.Wrapper):
             return obs
         else:
             return super().reset(**kwargs)
+
+class ClipRewardWrapper(gym.RewardWrapper):
+    """
+        Clips reward to {-1, 0, 1} depending on its sign.
+    """
+
+    def __init__(self, env: gym.Env):
+        super().__init__(env)
+
+    def reward(self, reward: float) -> float:
+        return np.sign(reward)
 
 
 class VectorizedEnvWrapper(Wrapper):

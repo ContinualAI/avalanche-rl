@@ -4,6 +4,7 @@ from typing import Callable, List, Union, Dict, Any
 import numpy as np
 import multiprocessing
 import types
+from copy import deepcopy
 
 # ref https://docs.ray.io/en/master/actors.html#creating-an-actor
 # https://stable-baselines3.readthedocs.io/en/master/guide/vec_envs.html
@@ -69,6 +70,34 @@ class Actor:
         # for degub purpose, you shouldn't need to call this method as it copies over the env
         return self.env
 
+def clone_wrapped_atari_env(env: gym.Wrapper, n_copies: int)->List[gym.Wrapper]:
+    """
+        Clone atari env by re-making unwrapped environment, copying only 'empty' wrappers
+        while re-assigning object references.
+    """
+    original_env = env
+    game_id = env.spec.id
+
+    wrappers = []
+    env_name = original_env.__class__.__name__
+    while env_name != 'TimeLimit' and env_name != 'AtariEnv':
+        wrappers.append(original_env)
+        original_env = original_env.env
+        env_name = original_env.__class__.__name__
+    # defer env pointer
+    wrappers[-1].env = None
+    envs = []
+    for _ in range(n_copies):
+        wrappers_copy = deepcopy(wrappers)
+        unwrapped_env = gym.make(game_id)
+
+        wrappers_copy[-1].env = unwrapped_env
+
+        for i in range(len(wrappers_copy)-2, -1, -1):
+            wrappers_copy[i].env = wrappers_copy[i+1]
+        envs.append(wrappers_copy[0])
+    return envs
+
 
 class VectorizedEnvironment(object):
     """
@@ -91,18 +120,23 @@ class VectorizedEnvironment(object):
         if isinstance(envs, types.FunctionType):
             # each env will be copied over to shared memory if the object is provided
             self.env = envs(**env_kwargs)
-            # FIXME: this is probably why a2c didnt work, ref to same object
-            envs = [envs] * self.n_envs
+            envs = [envs for _ in range(n_envs)]
         elif isinstance(envs, gym.Env):
-            from copy import deepcopy
-            self.env = envs
-            envs = [deepcopy(envs) for _ in range(self.n_envs)]
+            # FIXME: this is probably why a2c didnt work, ref to same object
+            # deepcopy isn't guaranteed to work with atari envs
+            if 'atari' in envs.spec.entry_point:
+                envs = clone_wrapped_atari_env(envs, n_envs+1)
+            else:
+                envs = [deepcopy(envs) for _ in range(n_envs+1)]
+            # copy kept in local for accessing env spec/attrs using this class
+            self.env = envs.pop()
         elif type(envs) is list:
             assert len(envs) == n_envs
+            # FIXME: ref to same object
             self.env = envs[0]
             # envs = [lambda _ : envs[i] for i in range(n_envs)]
 
-        # envs = [gym.make('PongNoFrameskip-v4') for _ in range(n_envs)]
+        # FIXME: actor needs to instantiate env locally or we get a corruction error
         self.actors = [Actor.remote(
                            envs[i],
                            i, env_kwargs, auto_reset=auto_reset)
