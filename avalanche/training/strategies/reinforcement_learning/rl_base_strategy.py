@@ -384,3 +384,13 @@ class RLBaseStrategy(BaseStrategy):
         # needed if env comes from train stream and is thus shared
         self.environment.reset()
         self.environment.close()
+
+    def _model_forward(self, model:nn.Module, observations: torch.Tensor, *args, **kwargs):
+
+        exp:RLExperience = getattr(self, 'experience', None)
+
+        task_label = None
+        if exp is not None:
+            task_label = exp.task_label
+
+        return model(observations, *args, **kwargs, task_label=task_label)

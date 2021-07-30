@@ -8,14 +8,15 @@ from avalanche.training.plugins.strategy_plugin import StrategyPlugin
 from torch.optim import Optimizer
 from torch.distributions import Categorical
 from avalanche.training import default_rl_logger
+from avalanche.models.actor_critic import A2CModel
 
 
 class A2CStrategy(RLBaseStrategy):
 
     def __init__(
-            self, model: nn.Module, optimizer: Optimizer,
+            self, model: A2CModel, optimizer: Optimizer,
             per_experience_steps: Union[int, Timestep, List[Timestep]],
-            max_steps_per_rollout:int=5,
+            max_steps_per_rollout: int = 5,
             value_criterion=nn.MSELoss(),
             discount_factor: float = 0.99, device='cpu',
             plugins: Optional[Sequence[StrategyPlugin]] = [],
@@ -33,7 +34,7 @@ class A2CStrategy(RLBaseStrategy):
             device=device, plugins=plugins,
             discount_factor=discount_factor, eval_every=eval_every, 
             eval_episodes=eval_episodes, evaluator=evaluator)
-            
+
         for exp_step in self.per_experience_steps:
             exp_step.unit == TimestepUnit.STEPS, 'A2C only supports expressing training duration in steps not episodes'
 
@@ -56,10 +57,11 @@ class A2CStrategy(RLBaseStrategy):
         """
         # sample action from policy network
         with torch.no_grad():
-            _, policy_logits = self.model(observations, compute_value=False)
+            _, policy_logits = self._model_forward(
+                self.model, observations, compute_value=False)
         # (alternative np.random.choice(num_outputs, p=np.squeeze(dist)))
         return Categorical(logits=policy_logits).sample().cpu().numpy()
-    
+
     def update(self, rollouts: List[Rollout]):
         # perform gradient step(s) over gathered rollouts
         self.loss = 0.
@@ -67,7 +69,8 @@ class A2CStrategy(RLBaseStrategy):
             # move samples to device for processing and expect tensor of shape `timesteps`x`n_envs`xD`
             rollout = rollout.to(self.device)
             # print("Rollout Observation shape", rollout.observations.shape)
-            values, policy_logits = self.model(rollout.observations)
+            values, policy_logits = self._model_forward(
+                self.model, rollout.observations)
             # ~log(softmax(taken_action_logits))
             # print("Rollout Actions shape", rollout.actions.shape)
             # FIXME: remove view
@@ -75,8 +78,8 @@ class A2CStrategy(RLBaseStrategy):
                 logits=policy_logits).log_prob(
                 rollout.actions.view(-1,))
             # compute next states values
-            next_values, _ = self.model(
-                rollout.next_observations, compute_policy=False)
+            next_values, _ = self._model_forward(
+                self.model, rollout.next_observations, compute_policy=False)
             # mask terminal states values
             next_values[rollout.dones.view(-1,)] = 0.
 

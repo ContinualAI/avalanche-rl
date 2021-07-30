@@ -4,12 +4,15 @@ import torch
 from torch.distributions import Categorical
 from typing import List, Union
 
+
 class A2CModel(nn.Module):
 
     def __init__(self):
         super().__init__()
 
-    def forward(state: torch.Tensor, compute_policy=True, compute_value=True):
+    def forward(
+            state: torch.Tensor, compute_policy=True, compute_value=True,
+            task_label=None):
         raise NotImplementedError()
 
     @torch.no_grad()
@@ -17,9 +20,14 @@ class A2CModel(nn.Module):
         _, policy_logits = self(observation, compute_value=False)
         return Categorical(logits=policy_logits).sample()
 
+
 class ActorCriticMLP(A2CModel):
 
-    def __init__(self, num_inputs, num_actions, actor_hidden_sizes: Union[int, List[int]]=[64, 64], critic_hidden_sizes: Union[int, List[int]]=[64, 64], activation_type:str='relu'):
+    def __init__(
+            self, num_inputs, num_actions,
+            actor_hidden_sizes: Union[int, List[int]] = [64, 64],
+            critic_hidden_sizes: Union[int, List[int]] = [64, 64],
+            activation_type: str = 'relu'):
         super(ActorCriticMLP, self).__init__()
         # these are actually 2 models in one
         if type(actor_hidden_sizes) is int:
@@ -34,9 +42,15 @@ class ActorCriticMLP(A2CModel):
         else:
             raise ValueError(f"Unknown activation type {activation_type}")
 
-        critic = [nn.Linear(critic_hidden_sizes[i], critic_hidden_sizes[i+1]) for i in range(1, len(critic_hidden_sizes)-1)]
-        actor = [nn.Linear(actor_hidden_sizes[i], actor_hidden_sizes[i+1]) for i in range(1, len(actor_hidden_sizes)-1)]
-        
+        critic = [nn.Linear(
+                      critic_hidden_sizes[i],
+                      critic_hidden_sizes[i + 1])
+                  for i in range(1, len(critic_hidden_sizes) - 1)]
+        actor = [
+            nn.Linear(actor_hidden_sizes[i],
+                      actor_hidden_sizes[i + 1])
+            for i in range(1, len(actor_hidden_sizes) - 1)]
+
         # self.critic_linear2 = nn.Linear(hidden_size, 1)
         self.critic = []
         for layer in [nn.Linear(num_inputs, critic_hidden_sizes[0])]+critic:
@@ -52,8 +66,8 @@ class ActorCriticMLP(A2CModel):
         self.actor.append(nn.Linear(actor_hidden_sizes[-1], num_actions))
         self.actor = nn.Sequential(*self.actor)
 
-    
-    def forward(self, state: torch.Tensor, compute_policy=True, compute_value=True):
+    def forward(self, state: torch.Tensor, compute_policy=True,
+                compute_value=True, task_label=None):
         value, policy_logits = None, None
         if compute_value:
             value = self.critic(state)
@@ -62,11 +76,13 @@ class ActorCriticMLP(A2CModel):
 
         return value, policy_logits
 
+
 class ConvActorCritic(A2CModel):
     """
         Smaller version of the Convolutional DQN network introduced in Mnih et al 2013 (DQN paper),
         re-used for experiments in Mnih et al. 2016 (A3C paper).
     """
+
     def __init__(self, input_channels, image_shape, n_actions, batch_norm=False):
         super(ConvActorCritic, self).__init__()
 
@@ -87,7 +103,7 @@ class ConvActorCritic(A2CModel):
         self.actor = nn.Linear(256, n_actions)
         self.critic = nn.Linear(256, n_actions)
 
-    def forward(self, x, compute_policy=True, compute_value=True):
+    def forward(self, x, compute_policy=True, compute_value=True, task_label=None):
         value, policy_logits = None, None
 
         # shared backbone of the actor-critic network
@@ -95,7 +111,7 @@ class ConvActorCritic(A2CModel):
         x = F.relu(self.conv2(x))
 
         x = self.fc(x.flatten(1))
-        
+
         if compute_policy:
             # actor logits output head
             policy_logits = self.actor(x)

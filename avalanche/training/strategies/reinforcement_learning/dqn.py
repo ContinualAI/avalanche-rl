@@ -12,6 +12,7 @@ import random
 from avalanche.training import default_rl_logger
 from avalanche.evaluation.metrics.reward import GenericFloatMetric
 from avalanche.training.plugins.evaluation import EvaluationPlugin
+from avalanche.models.dqn import DQNModel
 
 default_dqn_logger = EvaluationPlugin(
     *default_rl_logger.metrics,
@@ -24,7 +25,7 @@ default_dqn_logger = EvaluationPlugin(
 class DQNStrategy(RLBaseStrategy):
 
     def __init__(
-            self, model: nn.Module, optimizer: Optimizer,
+            self, model: DQNModel, optimizer: Optimizer,
             per_experience_steps: Union[int, Timestep, List[Timestep]], 
             rollouts_per_step: int = 8,  # how often do you perform an update step
             max_steps_per_rollout: int = -1,
@@ -152,7 +153,7 @@ class DQNStrategy(RLBaseStrategy):
         if random.random() > self.eps:
             # exploitation
             with torch.no_grad():
-                q_values = self.model(observations)
+                q_values = self._model_forward(self.model, observations)
                 actions = torch.argmax(
                     q_values, dim=1).cpu().type(
                     torch.int64).numpy()
@@ -172,8 +173,7 @@ class DQNStrategy(RLBaseStrategy):
         if self.double_dqn:
             # Q'(s', argmax_a' Q(s', a') ):
             # use model to select the action with maximal value (follow greedy policy with current weights)
-            max_actions = torch.argmax(
-                self.model(batch.next_observations), dim=1)
+            max_actions = torch.argmax(self._model_forward(self.model, batch.next_observations), dim=1)
             # evaluate q value of that action using fixed target network
             # select max actions, one per batch element
             next_q_values = next_q_values[torch.arange(
@@ -190,7 +190,7 @@ class DQNStrategy(RLBaseStrategy):
         batch = self.replay_memory.sample_batch(self.batch_dim, self.device)
 
         # compute q values prediction for whole batch: Q(s, a)
-        q_pred = self.model(batch.observations)
+        q_pred = self._model_forward(self.model, batch.observations)
         # print('obs shape', batch.observations.shape,'act', batch.actions.shape, 'q pred', q_pred.shape)
 
         # condition on taken actions (select performed actions' q-values)

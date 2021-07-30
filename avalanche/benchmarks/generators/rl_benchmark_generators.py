@@ -105,15 +105,22 @@ def atari_benchmark_generator(
         n_random_envs: int = None, n_parallel_envs: int = 1,
         eval_envs: Union[List[str], List[gym.Env]] = None, n_experiences=None,
         frame_stacking: bool = True, 
-        normalize_observations: bool=False,
-        clip_reward: bool=False,
+        normalize_observations: bool = False,
+        terminal_on_life_loss: bool = False,
+        clip_reward: bool = False,
         extra_wrappers: List[Wrapper] = [],
         *args, **kwargs) -> RLScenario:
     # setup atari specific env wrappers
-    wrappers = [lambda env: AtariPreprocessing(env=env, scale_obs=normalize_observations), FireResetWrapper]
+    wrappers = [
+        lambda
+        env:
+        AtariPreprocessing(
+            env=env, scale_obs=normalize_observations,
+            terminal_on_life_loss=terminal_on_life_loss),
+        FireResetWrapper]
     if clip_reward:
         wrappers.append(ClipRewardWrapper)
-        
+
     if frame_stacking:
         # TODO: consider https://github.com/openai/gym/blob/master/gym/wrappers/frame_stack.py
         from gym.wrappers.frame_stack import FrameStack

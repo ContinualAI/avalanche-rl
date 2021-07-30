@@ -9,7 +9,7 @@ class DQNModel(nn.Module):
     def __init__(self):
         super().__init__()
 
-    def forward(x: torch.Tensor):
+    def forward(x: torch.Tensor, task_label=None):
         raise NotImplementedError()
 
     @torch.no_grad()
@@ -32,7 +32,7 @@ class MLPDeepQN(DQNModel):
             num_classes=n_actions, input_size=input_size,
             hidden_size=hidden_size, hidden_layers=hidden_layers, dropout=False)
     
-    def forward(self, x: torch.Tensor):
+    def forward(self, x: torch.Tensor, task_label=None):
         return self.dqn(x)
         
 
@@ -55,7 +55,7 @@ class ConvDeepQN(DQNModel):
             nn.ReLU(),
             nn.Linear(512, n_actions))
 
-    def forward(self, x):
+    def forward(self, x, task_label=None):
         x = F.relu(self.conv1(x))
         x = F.relu(self.conv2(x))
         x = F.relu(self.conv3(x))

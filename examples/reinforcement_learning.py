@@ -98,7 +98,7 @@ if __name__ == "__main__":
     for experience in scenario.train_stream:
         print("Start of experience ", experience.current_experience)
         print("Current Env ", experience.env)
-        print("Current Task", experience.task_label)
+        print("Current Task", experience.task_label, type(experience.task_label))
         strategy.train(experience, scenario.test_stream)
         print('Training completed')
 
