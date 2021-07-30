@@ -13,8 +13,8 @@ class DQNModel(nn.Module):
         raise NotImplementedError()
 
     @torch.no_grad()
-    def get_action(self, observation: torch.Tensor):
-        q_values = self(observation)
+    def get_action(self, observation: torch.Tensor, task_label=None):
+        q_values = self(observation, task_label=task_label)
         return torch.argmax(q_values, dim=1).cpu().int().numpy()
 
 

@@ -168,7 +168,7 @@ class DQNStrategy(RLBaseStrategy):
     @torch.no_grad()
     def _compute_next_q_values(self, batch: Rollout):
         # Compute next state q values using fixed target net
-        next_q_values = self.target_net(batch.next_observations)
+        next_q_values = self._model_forward(self.target_net, batch.next_observations)
 
         if self.double_dqn:
             # Q'(s', argmax_a' Q(s', a') ):

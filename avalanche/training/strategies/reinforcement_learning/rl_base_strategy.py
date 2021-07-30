@@ -372,7 +372,7 @@ class RLBaseStrategy(BaseStrategy):
             for t in count():
                 # this may get stuck with games such as breakout and deterministic dqn
                 # if we let no op action be selected indefinitely 
-                action = self.model.get_action(obs.unsqueeze(0).to(self.device))
+                action = self.model.get_action(obs.unsqueeze(0).to(self.device), task_label=self.experience.task_label)
                 obs, reward, done, info = self.environment.step(action.item())
                 # TODO: use info
                 self.eval_rewards['past_returns'][ep_no] += reward

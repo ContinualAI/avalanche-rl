@@ -16,8 +16,8 @@ class A2CModel(nn.Module):
         raise NotImplementedError()
 
     @torch.no_grad()
-    def get_action(self, observation: torch.Tensor):
-        _, policy_logits = self(observation, compute_value=False)
+    def get_action(self, observation: torch.Tensor, task_label=None):
+        _, policy_logits = self(observation, compute_value=False, task_label=task_label)
         return Categorical(logits=policy_logits).sample()
 
 
