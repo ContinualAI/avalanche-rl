@@ -111,7 +111,7 @@ class DQNStrategy(RLBaseStrategy):
         rollouts = self.rollout(
             self.environment, n_rollouts=-1, max_steps=self.replay_init_size //
             self.n_envs)
-        if self.replay_memory is None:
+        if self.replay_memory is None or self.reset_replay:
             self.replay_memory = ReplayMemory(
                 size=self.replay_size, n_envs=self.n_envs)
 
@@ -120,11 +120,6 @@ class DQNStrategy(RLBaseStrategy):
         # adjust number of rollouts per step in order to assign equal load to each parallel actor
         self.rollouts_per_step = self.rollouts_per_step // self.n_envs
         return super().before_training_exp()
-
-    def after_training_exp(self, **kwargs):
-        if self.reset_replay:
-            self.replay_memory = None
-        return super().after_training_exp(**kwargs)
 
     def before_rollout(self, **kwargs):
         # update exploration rate
@@ -168,12 +163,14 @@ class DQNStrategy(RLBaseStrategy):
     @torch.no_grad()
     def _compute_next_q_values(self, batch: Rollout):
         # Compute next state q values using fixed target net
-        next_q_values = self._model_forward(self.target_net, batch.next_observations)
+        next_q_values = self._model_forward(
+            self.target_net, batch.next_observations)
 
         if self.double_dqn:
             # Q'(s', argmax_a' Q(s', a') ):
             # use model to select the action with maximal value (follow greedy policy with current weights)
-            max_actions = torch.argmax(self._model_forward(self.model, batch.next_observations), dim=1)
+            max_actions = torch.argmax(self._model_forward(
+                self.model, batch.next_observations), dim=1)
             # evaluate q value of that action using fixed target network
             # select max actions, one per batch element
             next_q_values = next_q_values[torch.arange(
@@ -200,6 +197,7 @@ class DQNStrategy(RLBaseStrategy):
         # compute target Q value: Q*(s, a) = R_t + gamma * max_{a'} Q(s', a') 
         next_q_values = self._compute_next_q_values(batch)
         # print('q next', next_q_values.shape, batch.rewards.shape, batch.dones.shape, 'q pred', q_pred.shape)
+
         # mask terminal states only after max q value action has been selected
         q_target = batch.rewards + self.gamma * \
             (1 - batch.dones.int()) * next_q_values.unsqueeze(-1)
@@ -209,5 +207,6 @@ class DQNStrategy(RLBaseStrategy):
     def after_backward(self, **kwargs):
         # Gradient norm clipping
         if self.max_grad_norm is not None:
-            torch.nn.utils.clip_grad_norm_(self.model.parameters(), self.max_grad_norm)
+            torch.nn.utils.clip_grad_norm_(
+                self.model.parameters(), self.max_grad_norm)
         return super().after_backward(**kwargs)
