@@ -38,6 +38,69 @@ class RLBaseStrategy(BaseStrategy):
             plugins: Optional[Sequence[StrategyPlugin]] = [],
             discount_factor: float = 0.99, evaluator=default_rl_logger,
             eval_every=-1, eval_episodes: int = 1):
+        """
+            RLBaseStrategy specializes BaseStrategy to handle Reinforcement Learning tasks
+            in the continual learning setting and should be subclassed by all RL strategies.
+            It implements a general training loop building on top of the one provided by BaseStrategy,
+            which should be valid for both on and off-policy algorithms, in which at each training
+            experience iteration a 'rollout phase' is followed by an 'update'.
+            All continual learning scenarios described in the super-class are still supported.
+            Additional callbacks have been provided before and after the rollout phase and can be
+            used to further enhance the training loop with additional behavior.
+
+            **Training loop**
+            The training loop is organized as follows::
+                train
+                    train_exp  # for each experience
+                        make_train_env
+                        make_optimizer
+                        # for `steps_per_experience` times
+                        rollout
+                        # for `updates_per_step` times
+                            update, to be defined by sub-strategy (e.g. DQN/A2C..)
+                            backward
+                            optimizer step
+
+            **Evaluation loop**
+            The evaluation loop is organized as follows::
+                eval
+                    eval_exp  # for each experience
+                        make_eval_env
+                        evaluate_experience  # for `eval_episodes` episodes
+                            # get action `a ~ model.get_action(..)`
+                            # step environment simulator `env.step(a)`
+                            # record reward and episode length
+
+        Args:
+            :param model: PyTorch model.
+            :param optimizer: PyTorch optimizer.
+            :param per_experience_steps (Union[int, Timestep, List[Timestep]]): Number of steps to perform for each experience. 
+                    Steps can either be expressed in terms of number of episodes or actual time steps. 
+                    If a single integer is passed, each experience will be run for the same amount of time steps.
+            :param criterion: loss function. Defaults to nn.MSELoss().
+            :param rollouts_per_step (int, optional): Number of rollouts to be performed at each step. A rollout is 
+                     to be intended as a sequence of environment interactions which terminate upon reaching the
+                     terminal episode signal (`done=True` in Gym interface). Defaults to 1.
+            :param max_steps_per_rollout (int, optional): Number of rollouts steps to be performed at each step. Note 
+                     that we don't wait for the episode to be done but we advance for a fixed amount of steps, resetting
+                     the environment on terminal signal. If `rollouts_per_step` is also > 0 these parameters are combined,
+                     unrolling `rollouts_per_step` rollouts of at most `max_steps_per_rollout` length. Defaults to -1.
+            :param updates_per_step (int, optional): Number of update steps to perform at each experience step. Defaults to 1.
+            :param device: PyTorch device where the model will be allocated.
+            :param plugins: (optional) list of StrategyPlugins.
+            :param discount_factor (float, optional): Also known as \gamma in RL literature, discount factor used 
+                    in weighting rewards importance. Defaults to 0.99.
+            :param evaluator: (optional) instance of EvaluationPlugin for logging
+                and metric computations. None to remove logging.
+            :param eval_every: the frequency of the calls to `eval` inside the
+                training loop.
+                    if -1: no evaluation during training (Default).
+                    if  0: calls `eval` after the final epoch of each training
+                        experience.
+                    if >0: calls `eval` every `eval_every` epochs and at the end
+                        of all the epochs for a single experience.
+            :param eval_episodes (int, optional): Number of episodes to run during evaluation. Defaults to 1.
+        """
 
         super().__init__(model, optimizer, criterion=criterion, device=device,
                          plugins=plugins, eval_every=eval_every, evaluator=evaluator)
@@ -176,14 +239,6 @@ class RLBaseStrategy(BaseStrategy):
         raise NotImplementedError(
             "`update` must be implemented by every RL strategy")
 
-    def before_make_env(self, **kwargs):
-        for p in self.plugins:
-            p.before_make_env(self, **kwargs)
-
-    def after_make_env(self, **kwargs):
-        for p in self.plugins:
-            p.after_make_env(self, **kwargs)
-
     def make_train_env(self, **kwargs):
         # maintain vectorized env interface without parallel overhead if `n_envs` is 1
         if self.n_envs == 1:
@@ -244,9 +299,7 @@ class RLBaseStrategy(BaseStrategy):
                         'past_returns': []}
 
         # Environment creation
-        self.before_make_env(**kwargs)
         self.environment = self.make_train_env(**kwargs)
-        self.after_make_env(**kwargs)
 
         # Model Adaptation (e.g. freeze/add new units)
         # self.model_adaptation()
@@ -285,11 +338,7 @@ class RLBaseStrategy(BaseStrategy):
         self.environment.close()
 
         # Final evaluation
-        do_final = True
-        if self.eval_every > 0 and \
-                self.timestep % self.eval_every == 0:
-            do_final = False
-        self._periodic_eval(eval_streams, do_final=do_final)
+        self._periodic_eval(eval_streams, do_final=(self.timestep % self.eval_every != 0))
         self.after_training_exp(**kwargs)
 
     def _periodic_eval(self, eval_streams, do_final):
@@ -304,15 +353,14 @@ class RLBaseStrategy(BaseStrategy):
             self.n_envs,
             self.is_training)
 
-        if (self.eval_every == 0 and do_final) or \
+        if (self.eval_every >= 0 and do_final) or \
            (self.eval_every > 0 and self.timestep % self.eval_every == 0):
             for exp in eval_streams:
                 self.eval(exp)
 
         # restore train-state variables and training mode.
         self.timestep, self.experience, self.environment = _prev_state[:3]
-        self.n_envs = _prev_state[3]
-        self.is_training = _prev_state[3]
+        self.n_envs, self.is_training = _prev_state[3:]
         self.model.train()
 
     @torch.no_grad()
@@ -337,15 +385,12 @@ class RLBaseStrategy(BaseStrategy):
 
         self.before_eval(*kwargs)
         for self.experience in exp_list:
-            # FIXME: is this wrapped multiple times cause of same reference??
             self.environment = self.experience.environment
             # only single env supported during evaluation
             self.n_envs = self.experience.n_envs
-            
+
             # Create test Environment
-            self.before_make_env(**kwargs)
             self.environment = self.make_eval_env(**kwargs)
-            self.after_make_env(**kwargs)
 
             # Model Adaptation (e.g. freeze/add new units)
             # self.model_adaptation()
@@ -386,6 +431,13 @@ class RLBaseStrategy(BaseStrategy):
         self.environment.close()
 
     def _model_forward(self, model:nn.Module, observations: torch.Tensor, *args, **kwargs):
+        """Method for handling forward passage of model handling task label retrieval.
+        Args:
+            model (nn.Module): Pytorch model to feed observations to.
+            observations (torch.Tensor): Input to model.
+        Returns:
+            Model output.
+        """
 
         exp:RLExperience = getattr(self, 'experience', None)
 

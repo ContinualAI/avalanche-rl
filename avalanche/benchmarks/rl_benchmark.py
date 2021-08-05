@@ -39,6 +39,7 @@ class RLScenario(GenericCLScenario['RLExperience']):
         assert all([n > 0 for n in n_parallel_envs]
                    ), "Number of parallel environments must be a positive integer"
         self.envs = envs
+        self._num_original_envs = len(self.envs)
         self.n_envs = n_parallel_envs
         self.train_task_labels = list(range(len(envs)))
         self.eval_task_labels = list(range(len(eval_envs)))

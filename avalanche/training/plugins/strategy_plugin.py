@@ -104,9 +104,3 @@ class StrategyPlugin(StrategyCallbacks[Any]):
 
     def after_rollout(self, strategy: 'BaseStrategy', **kwargs):
         pass
-
-    def before_make_env(self, strategy: 'BaseStrategy', **kwargs):
-        pass
-
-    def after_make_env(self, strategy: 'BaseStrategy', **kwargs):
-        pass

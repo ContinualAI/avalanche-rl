@@ -53,6 +53,8 @@ class MovingWindowedStatsPluginMetric(PluginMetric[List[float]]):
                     values.append(np.std(self._moving_window.window))
                 else:
                     values.append(0.)
+            if 'sum' == stat:
+                values.append(np.sum(self._moving_window.window))
         return values
 
     def __str__(self) -> str:

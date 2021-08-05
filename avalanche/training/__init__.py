@@ -18,6 +18,6 @@ default_logger = EvaluationPlugin(
     loggers=[InteractiveLogger()])
 
 default_rl_logger = EvaluationPlugin(
-                                     RewardPluginMetric(window_size=100, stats=['mean', 'max', 'std']),
-                                     EpLenghtPluginMetric(window_size=100, stats=['mean', 'max', 'std']),
+                                     RewardPluginMetric(window_size=10, stats=['mean', 'max', 'std']),
+                                     EpLenghtPluginMetric(window_size=10, stats=['mean', 'max', 'std']),
                                      loggers=[TqdmWriteInteractiveLogger(log_every=10)])

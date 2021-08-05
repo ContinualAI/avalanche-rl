@@ -1,6 +1,7 @@
 <div align="center">
     
-# Avalanche: an End-to-End Library for Continual Learning
+# Avalanche RL: an End-to-End Library for Continual Reinforcement Learning
+<!-- # Avalanche: an End-to-End Library for Continual Learning -->
 **[Avalanche Website](https://avalanche.continualai.org)** | **[Getting Started](https://avalanche.continualai.org/getting-started)** | **[Examples](https://avalanche.continualai.org/examples)** | **[Tutorial](https://avalanche.continualai.org/from-zero-to-hero-tutorial)** | **[API Doc](https://avalanche-api.continualai.org)** | **[Paper](https://arxiv.org/abs/2104.00405)** | **[Twitter](https://twitter.com/AvalancheLib)**
 
 [![unit test](https://github.com/ContinualAI/avalanche/actions/workflows/unit-test.yml/badge.svg)](https://github.com/ContinualAI/avalanche/actions/workflows/unit-test.yml)
@@ -14,129 +15,94 @@
     <img src="https://www.dropbox.com/s/90thp7at72sh9tj/avalanche_logo_with_clai.png?raw=1"/>
 </p>
 
+**Avalanche RL** is a fork of ContinualAI's Pytorch-based framework [**Avalanche**](https://github.com/ContinualAI/avalanche) with the goal of extending its capabilities to Continual Reinforcement Learning (*CRL*), *bootstrapping* from the work done on Super/Unsupervised Continual Learning.
+
+It should support all environments sharing the `gym.Env` interface, handle stream of experiences, provide strategies for RL algorithms and enable fast prototyping through an extremely flexible and customizable API. 
+
+The core structure and design principles of Avalanche are to remain untouched to easen the learning curve for all continual learning practitioners, so we still work with the same modules you can find in avl:
+- [Benchmarks](avalanche/benchmarks) for managing data and stream of data.
+- [Training](avalanche/training) for model training making use of extensible strategies.
+- [Evaluation](avalanche/evaluation) to evaluate the agent on consistent metrics.
+- [Extras](avalanche/extras) for general utils and building blocks.
+- [Models](avalanche/models) contains commonly used model architectures.
+- [Logging](avalanche/logging) for logging metrics during training/evaluation.
+
+Head over to [Avalanche Website](https://avalanche.continualai.org) to learn more if these concepts sound unfamiliar to you!
+
+## Features
+___
+Features added so far in this fork can be summarized and grouped by module.
+### *Benchmarks*
+[RLScenario](https://github.com/NickLucche/avalanche/blob/master/avalanche/benchmarks/rl_benchmark.py) introduces a Benchmark for RL which augments each experience with an 'Environment' (defined through [OpenAI `gym.Env` interface](https://github.com/openai/gym/blob/120e21cd75db36cce241f1b3a23184d3876c9753/gym/core.py#L8)) effectively implementing a "stream of environments" with which the agent can interact to generate data and learn from that interaction during each experience. This concept models the way experiences in the supervised CL context are translated to CRL, moving away from the concept of Dataset toward a dynamic interaction through which data is generated.
+
+[RL Benchmark Generators](https://github.com/NickLucche/avalanche/blob/master/avalanche/benchmarks/generators/rl_benchmark_generators.py) allow to build these streams of experiences seamlessly, supporting:
+ - Any sequence of `gym.Env` environments through `gym_benchmark_generator`, which returns a `RLScenario` from a list of environments ids (e.g. `["CartPole-v1", "MountainCar-v0", ..]`) with access to a train and test stream just like in Avalanche. It also supports sampling a random number of environments if you wanna get wild with your experiments.
+ - Atari 2600 games through `atari_benchmark_generator`, taking care of common Wrappers (e.g. frame stacking) for these environments to get you started even more quickly.
+ - [Habitat](https://github.com/facebookresearch/habitat-sim/), more on this later.
+
+ ### *Training*
+ [RLBaseStrategy]() is the super-class of all RL algorithms, augmenting `BaseStrategy` with RL specific callbacks while still making use of all major features such as plugins, logging and callbacks.
+ Inspired by the amazing [`stable-baselines-3`](https://github.com/DLR-RM/stable-baselines3), it supports both on and off-policy algorithms under a common API defined as a 'rollouts phase' (data gathering) followed by an 'update phase', whose specifics are implemented by subclasses (RL algorithms).
+
+ Algorithms are added to the framework by subclassing `RLBaseStrategy` and implementing specific callbacks. You can check out [this implementation of A2C](https://github.com/NickLucche/avalanche/blob/master/avalanche/training/strategies/reinforcement_learning/actor_critic.py) in under 50 lines of actual code including the `update` step and the action sampling mechanism.
+ Currently only A2C and DQN+DoubleDQN algorithms have been implemented, including various other "utils" such as Replay Buffer.
+
+ Training with multiple agent is supported through [`VectorizedEnv`](https://github.com/NickLucche/avalanche/blob/master/avalanche/training/strategies/reinforcement_learning/vectorized_env.py), leveraging [Ray](https://ray.io/) for parallel and potentially distributed execution of multiple environment interactions.   
+
+ ### Evaluation
+ New metrics have been added to keep track of rewards, episodes length and any kind of scalar value (such as Epsilon Greedy 'eps') during experiments. Metrics are kept track of using a moving averaged window, useful for smoothing out fluctuations and recording standard deviation and max values reached.  
+ ### Extras
+ Several common environment Wrappers are also kept [here](https://github.com/NickLucche/avalanche/blob/master/avalanche/training/strategies/reinforcement_learning/utils.py) as we encourage the use of this pattern to suit environments output to your needs. 
+ We also provide common [gym control environments](https://github.com/NickLucche/avalanche/blob/master/avalanche/envs/classic_control.py) which have been "parametrized" so you can tweak values such as force and gravity to help out in testing new ideas in a fast and reliable way on well known testbeds. These environments are available by pre-pending a `C` to the env id as in `CCartPole-v1` as they're registered on first import.
+ 
+ ### Models
+ In this module you can find an implementation of both MLPs and CNNs for deep-q learning and actor-critic approaches, adapted from popular papers such as "Human-level Control Through Deep Reinforcement Learning" and "Overcoming catastrophic forgetting in neural networks" to learn directly from pixels or states.  
+ 
+ ### Logging
+ A Tqdm-based interactive logger has been added to ease readability as well as sensible default loggers for RL algorithms.
 
 
-**Avalanche** is an *end-to-end Continual Learning library* based on **Pytorch**, born within ContinualAI with the unique goal of providing a shared and collaborative 
-open-source (MIT licensed) codebase for fast prototyping, training and reproducible evaluation of continual learning algorithms. 
-Avalanche can help Continual Learning researchers in several ways:
 
-- *Write less code, prototype faster & reduce errors*
-- *Improve reproducibility*
-- *Improve modularity and reusability*
-- *Increase code efficiency, scalability & portability*
-- *Augment impact and usability of your research products*
-
-The library is organized into four main modules:
-
-- [Benchmarks](avalanche/benchmarks): This module maintains a uniform API for data handling: mostly generating a stream of data from one or more datasets. It contains all the major CL benchmarks (similar to what has been done for torchvision).
-- [Training](avalanche/training): This module provides all the necessary utilities concerning model training. This includes simple and efficient ways of implement new continual learning strategies as well as a set of pre-implemented CL baselines and state-of-the-art algorithms you will be able to use for comparison!
-- [Evaluation](avalanche/evaluation): This module provides all the utilities and metrics that can help evaluate a CL algorithm with respect to all the factors we believe to be important for a continually learning system. It also includes advanced logging and plotting features, including native Tensorboard support.
-- [Extras](avalanche/extras): In the extras module you'll be able to find several useful utilities and building blocks that will help you create your continual learning experiments with ease. This includes configuration files for quick reproducibility and model building functions for example.
-- [Models](avalanche/models): In this module you'll be able to find several model architectures and pre-trained models that can be used for your continual learning experiment (similar to what has been done in torchvision.models).
-- [Logging](avalanche/logging): It includes advanced logging and plotting features, including native stdout, file and TensorBoard support (How cool it is to have a complete, interactive dashboard, tracking your experiment metrics in real-time with a single line of code?)
-
-_Avalanche_ the first experiment of an **End-to-end Library** for reproducible continual learning research & development where you can find benchmarks, algorithms, evaluation metrics and much more, in the same place.
-
-Let's make it together :people_holding_hands: a wonderful ride! :balloon:
-
-Check out below how you can start using Avalanche! :point_down:
-
-Quick Example
+## Quick Example
 ----------------
 
 ```python
 import torch
-from torch.nn import CrossEntropyLoss
-from torch.optim import SGD
+from torch.optim import Adam
+from avalanche.benchmarks.generators.rl_benchmark_generators import gym_benchmark_generator
 
-from avalanche.benchmarks.classic import PermutedMNIST
-from avalanche.models import SimpleMLP
-from avalanche.training.strategies import Naive
+from avalanche.models.actor_critic import ActorCriticMLP
+from avalanche.training.strategies.reinforcement_learning import A2CStrategy
 
 # Config
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-# model
-model = SimpleMLP(num_classes=10)
+# Model
+model = ActorCriticMLP(num_inputs=4, num_actions=2, actor_hidden_sizes=1024, critic_hidden_sizes=1024)
 
-# CL Benchmark Creation
-perm_mnist = PermutedMNIST(n_experiences=3)
-train_stream = perm_mnist.train_stream
-test_stream = perm_mnist.test_stream
+# CRL Benchmark Creation
+scenario = gym_benchmark_generator(['CartPole-v1'], n_experiences=1, n_parallel_envs=1, 
+    eval_envs=['CartPole-v1'])
 
 # Prepare for training & testing
-optimizer = SGD(model.parameters(), lr=0.001, momentum=0.9)
-criterion = CrossEntropyLoss()
+optimizer = Adam(model.parameters(), lr=1e-4)
 
-# Continual learning strategy
-cl_strategy = Naive(
-    model, optimizer, criterion, train_mb_size=32, train_epochs=2,
-    eval_mb_size=32, device=device)
+# Reinforcement Learning strategy
+strategy = A2CStrategy(model, optimizer, per_experience_steps=10000, max_steps_per_rollout=5, 
+    device=device, eval_every=1000, eval_episodes=10)
 
 # train and test loop
 results = []
-for train_task in train_stream:
-    cl_strategy.train(train_task, num_workers=4)
-    results.append(cl_strategy.eval(test_stream))
+for experience in scenario.train_stream:
+    strategy.train(experience)
+    results.append(strategy.eval(scenario.test_stream))
 ```
+Compare it with [vanilla Avalanche snippet](https://avalanche.continualai.org/)!
 
-Current Release
+Check out more examples [here](https://github.com/NickLucche/avalanche/blob/master/examples/reinforcement_learning/) (soon more advanced ones) or in unit tests.
+
+Disclaimer
 ----------------
+This fork is under strict development so expect changes on the main branch on a fairly regular basis. As Avalanche itself it's still in its early Alpha versions, it's only fair to say that Avalanche RL is in super-duper pre-Alpha.
 
-Avalanche is a framework in constant development. Thanks to the support of the [ContinualAI]() community and its active members we are quickly extending its features and improve its usability based on the demands of our research community!
+We believe there's lots of room for improvements and tweaking but at the same time there's much that can be offered to the growing community of continual learning practitioners approaching reinforcement learning by allowing to perform experiments under a common framework with a well-defined structure.
 
-A the moment, Avalanche is in [**Alpha v0.0.1**](https://avalanche.continualai.org/getting-started/alpha-version), but we already support [several *Benchmarks*, *Strategies* and *Metrics*](https://avalanche.continualai.org/getting-started/alpha-version), that make it, we believe, the best tool out there for your continual learning research! 💪
-
-*Please note that, at the moment, we **do not** support stable releases and packaged versions of the library.*
-*We do this intentionally as in this early phase we would like to stimulate contributions only from experienced CL researchers and coders.*
-
-Getting Started
-----------------
-
-We know that learning a new tool may be tough at first. This is why we made Avalanche as easy as possible to learn with a set of resources that will help you along the way.
-For example, you may start with our 5-minutes guide that will let you acquire the basics about Avalanche and how you can use it in your research project:
-
-- [Getting Started Guide](https://avalanche.continualai.org/getting-started)
-
-We have also prepared for you a large set of examples & snippets you can plug-in directly into your code and play with:
-
-- [Avalanche Examples](https://avalanche.continualai.org/examples)
-
-Having completed these two sections, you will already feel with superpowers ⚡, this is why we have also created an in-depth tutorial that will cover all the aspects of Avalanche in 
-detail and make you a true Continual Learner! :woman_student:
-
-- [From Zero to Hero Tutorial](https://avalanche.continualai.org/from-zero-to-hero-tutorial)
-
-Cite Avalanche
-----------------
-If you used Avalanche in your research project, please remember to cite our reference paper published at the [CLVision @ CVPR2021](https://sites.google.com/view/clvision2021/overview?authuser=0) workshop: ["Avalanche: an End-to-End Library for Continual Learning"](https://arxiv.org/abs/2104.00405). 
-This will help us make Avalanche better known in the machine learning community, ultimately making a better tool for everyone:
-
-```
-@InProceedings{lomonaco2021avalanche,
-    title={Avalanche: an End-to-End Library for Continual Learning},
-    author={Vincenzo Lomonaco and Lorenzo Pellegrini and Andrea Cossu and Antonio Carta and Gabriele Graffieti and Tyler L. Hayes and Matthias De Lange and Marc Masana and Jary Pomponi and Gido van de Ven and Martin Mundt and Qi She and Keiland Cooper and Jeremy Forest and Eden Belouadah and Simone Calderara and German I. Parisi and Fabio Cuzzolin and Andreas Tolias and Simone Scardapane and Luca Antiga and Subutai Amhad and Adrian Popescu and Christopher Kanan and Joost van de Weijer and Tinne Tuytelaars and Davide Bacciu and Davide Maltoni},
-    booktitle={Proceedings of IEEE Conference on Computer Vision and Pattern Recognition},
-    series={2nd Continual Learning in Computer Vision Workshop},
-    year={2021}
-}
-```
-
-Maintained by ContinualAI Lab
-----------------
-
-*Avalanche* is the flagship open-source collaborative project of [ContinualAI](https://www.continualai.org/): a non-profit research organization and the largest open community on Continual Learning for AI.
-
-Do you have a question, do you want to report an issue or simply ask for a new feature? Check out the [Questions & Issues](https://avalanche.continualai.org/questions-and-issues/ask-your-question) center. Do you want to improve Avalanche yourself? Follow these simple rules on [How to Contribute](https://app.gitbook.com/@continualai/s/avalanche/~/drafts/-MMtZhFEUwjWE4nnEpIX/from-zero-to-hero-tutorial/6.-contribute-to-avalanche).
-
-The Avalanche project is maintained by the collaborative research team [ContinualAI Lab](https://www.continualai.org/lab/) and used extensively by the Units of the [ContinualAI Research (CLAIR)](https://www.continualai.org/research/) consortium, a research network of the major continual learning stakeholders around the world.
-
-We are always looking for new awesome members willing to join the ContinualAI Lab, so check out our [official website](https://www.continualai.org/lab/) if you want to learn more about us and our activities, or [contact us](https://avalanche.continualai.org/contacts-and-links/the-team#contacts).
-
-Learn more about the [Avalanche team and all the people who made it great](https://avalanche.continualai.org/contacts-and-links/the-team)!
-
-<br>
-<p align="left">
-<a href="https://github.com/ContinualAI/avalanche/graphs/contributors">
- <img width="700" src="https://contrib.rocks/image?repo=ContinualAI/avalanche" />
-</a>
-</p>
