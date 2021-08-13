@@ -3,7 +3,8 @@ import numpy as np
 import gym
 import torch
 import cv2
-from typing import Tuple, Union, Dict, Any
+from typing import Tuple, Union, Dict, Any, List
+from gym.spaces.box import Box
 
 # Env wrappers adapted from pytorch lighting bolts
 
@@ -32,8 +33,8 @@ class CropObservationWrapper(ObservationWrapper):
         self.resize_shape = resize_shape
         old_space = env.observation_space
         self.observation_space = gym.spaces.Box(
-            low=(0 if old_space.dtype == np.uint8 else 0.),
-            high=(255 if old_space.dtype == np.uint8 else 1.),
+            low=old_space.low.min(),
+            high=old_space.high.max(),
             shape=resize_shape,
             dtype=old_space.dtype,
         )
@@ -67,17 +68,17 @@ class FrameStackingWrapper(ObservationWrapper):
         """convert observation"""
         self.buffer[:-1] = self.buffer[1:]
         self.buffer[-1] = observation
-        # return a copy of current buffer
+        # return a copy of current buffer o/w will be referencing same object
         return self.buffer.copy()
 
 
 class Array2Tensor(ObservationWrapper):
+    """ Convert observation from numpy array to torch tensors. """
 
     def __init__(self, env):
         super(Array2Tensor, self).__init__(env)
 
     def observation(self, observation):
-        """convert observation"""
         t = torch.from_numpy(observation).float()
         return t
 
@@ -109,6 +110,7 @@ class FireResetWrapper(gym.Wrapper):
         else:
             return super().reset(**kwargs)
 
+
 class ClipRewardWrapper(gym.RewardWrapper):
     """
         Clips reward to {-1, 0, 1} depending on its sign.
@@ -121,10 +123,44 @@ class ClipRewardWrapper(gym.RewardWrapper):
         return np.sign(reward)
 
 
+class ReducedActionSpaceWrapper(gym.ActionWrapper):
+
+    def __init__(
+            self, env: gym.Env,
+            action_space_dim: int,
+            action_mapping: Dict[int, int] = {1: 2, 2: 3}) -> None:
+        """Re-maps action space to specified values. This is particularly useful with 
+           atari environments such as Pong having a default action space which is 
+           unnecessarily big (only 3 actions have effect).
+           It is also useful when learning a single policy for multiple
+           envs, in that case you can re-map model output to specific actions depending
+           on the game being played directly from the wrapper (e.g. game1 {0, 1}->{7, 8},
+           game2 {0, 1}->{2, 3}).
+
+        Args:
+            env (gym.Env): The environment to wrap.
+            action_space_dim (int): Dimension of the new action space. This wrapper only
+            supports `Discrete` action spaces. 
+            action_mapping (Dict[int, int], optional): A dict specifying which actions 
+            must be re-mapped from {network output -> game actions} 'codes'. 
+            Unspecified actions are left as they are. Defaults to {1: 2, 2: 3}, which in Pong
+            removes `FIRE` from actions, leaving NO_OP-LEFT-RIGHT if `action_space_dim` 
+            is also set to 3.
+        """
+        assert action_space_dim > 0, 'action space must be strictly positive'
+        super().__init__(env)
+        self.action_space = gym.spaces.Discrete(action_space_dim)
+        self._action_mapping = action_mapping
+
+    def action(self, action):
+        # re-map actions
+        return self._action_mapping.get(action, action)
+
+
 class VectorizedEnvWrapper(Wrapper):
     """ 
     Wraps a single environment maintaining the interface of vectorized environment 
-    with none of the overhead involved by running parallel environments.  
+    with none of the overhead involved in running parallel environments.  
     """
 
     def __init__(self, env: gym.Env, auto_reset: bool = True) -> None:

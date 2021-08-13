@@ -1,13 +1,13 @@
 from collections import defaultdict
 from gym.core import Wrapper
-from avalanche.benchmarks.rl_benchmark import *
+from avalanche.benchmarks.rl_benchmark import RLScenario
 import gym
 from gym import envs
 from typing import *
 import numpy as np
 import importlib.util
 from gym.wrappers.atari_preprocessing import AtariPreprocessing
-from avalanche.training.strategies.reinforcement_learning.utils import ClipRewardWrapper, FireResetWrapper, FrameStackingWrapper
+from avalanche.training.strategies.reinforcement_learning.env_wrappers import ClipRewardWrapper, FireResetWrapper, FrameStackingWrapper
 import random
 
 
@@ -15,15 +15,23 @@ def get_all_envs_id():
     return envs.registry.env_specs.keys()
 
 
-def get_all_atari_envs_id():
+def get_all_atari_envs_id(no_frameskip_only: bool = True):
     all_envs = envs.registry.all()
-    return [env_spec.id for env_spec in all_envs if 'atari' in env_spec.entry_point]
+    atari_envs = []
+    for env_spec in all_envs:
+        if 'atari' in env_spec.entry_point:
+            if no_frameskip_only and 'NoFrameskip' not in env_spec.id:
+                continue
+            atari_envs.append(env_spec.id)
+
+    return atari_envs
 
 
 def make_env(
         env_name: str, env_kwargs: Dict[Any, Any] = dict(),
         wrappers: Wrapper = None):
     env = gym.make(env_name, **env_kwargs)
+
     if wrappers is not None:
         for wrapper in wrappers:
             env = wrapper(env)
@@ -38,8 +46,37 @@ def gym_benchmark_generator(
         n_parallel_envs: int = 1,
         eval_envs: Union[List[str], List[gym.Env]] = None,
         n_experiences=None,
-        env_wrappers: Union[Wrapper, List[Wrapper], Dict[str, List[Wrapper]]] = None,
+        env_wrappers: Union[Callable[[Any], Wrapper], List[Callable[[Any], Wrapper]], Dict[str, List[Callable[[Any], Wrapper]]]] = None,
         envs_ids_to_sample_from: List[str] = None, *args, **kwargs) -> RLScenario:
+    """
+    Generates a RL benchmark with the provided options. You can build a benchmark by either
+    passing a sequence of registered env ids or of environment instances, or you can specify
+    a random number of environments to sample from `envs_ids_to_sample_from`. If multiple options
+    are specified, priority is given to topmost arguments.
+    An RLScenario will be returned which will give access to the usual `train` and `test` experience
+    streams, with each experience containing an Env with which the agent can interact.
+
+    Args:
+        env_names (List[str], optional): List of OpenAI Gym registered environments. First option for creating a benchmark.
+        environments (List[gym.Env], optional): List of OpenAI Gym environments instances. Second option for creating a benchmark.
+        n_random_envs (int, optional): Number of random envs to sample to create a scenario. Note that you can specify a set of ids 
+        to sample from with the argument `envs_ids_to_sample_from`. Third option for creating a benchmark.
+        env_kwargs (Dict[str, Dict[Any, Any]], optional): A dictionary <env_id: init_kwargs> used to pass extra args during creation of envs. Defaults to dict().
+        n_parallel_envs (int, optional): Number of parallel environments to instantiate, using `VectorizedEnv` to spawn multiple agents with their own copy 
+        of the environment. Defaults to 1.
+        eval_envs (Union[List[str], List[gym.Env]], optional): List of env ids to use during evaluation. If None is passed, train environments will be used for evaluation.
+        n_experiences ([type], optional): Number of experiences to generate with the provided envs. If greater than number of envs, envs will be looped through. Defaults to number of envs.
+        env_wrappers (Union[Wrapper, List[Wrapper], Dict[str, List[Wrapper]]], optional): A sequence of wrapper classes to be instatiated along the provided envs ids. 
+        These are not considered if envs instances are passed, as we assume they're already wrapped. Defaults to None.
+        envs_ids_to_sample_from (List[str], optional): List of enviornments ids to sample from, only valid if `n_random_envs` is specified. Defaults to all registered environments ids.
+
+    Raises:
+        ValueError: If none of the three options for creating environments are specified, namely: `env_names`, `environments` and `n_random_envs`.
+        ValueError: If unrecognized `eval_envs` type is passed.
+
+    Returns:
+        RLScenario: Scenario with `train` and `test` experience stream containing specified environments.
+    """
 
     # if one or more wrapper are passed without spefic key, use that for every environment
     wrappers = defaultdict(list)
@@ -97,7 +134,7 @@ def gym_benchmark_generator(
 
     return RLScenario(
         envs=envs_, n_experiences=n_experiences,
-        n_parallel_envs=n_parallel_envs, eval_envs=eval_envs, *args, **kwargs)
+        n_parallel_envs=n_parallel_envs, eval_envs=eval_envs, wrappers_generators=wrappers, *args, **kwargs)
 
 
 def atari_benchmark_generator(
@@ -110,6 +147,29 @@ def atari_benchmark_generator(
         clip_reward: bool = False,
         extra_wrappers: List[Wrapper] = [],
         *args, **kwargs) -> RLScenario:
+    """
+        Generates a scenario with specific support for Atari environments, mostly involving 
+        wrappers for common pre-processing techniques, such as image cropping and frame stacking. 
+
+        You can build a benchmark by either supplying registered atari environment ids -in such case 
+        you must provide the `NoFrameskip` version of the environemnts as frame skipping is implemented
+        in `AtariPreprocessing`- or sample randomly from all registered games.
+    Args:
+        env_names (List[str], optional): List of registered atari environments ids. Defaults to [].
+        n_random_envs (int, optional): Alternative way of creating benchmark, number of environments to sample. Defaults to None.
+        n_parallel_envs (int, optional): Number of parallel environments to instantiate, using `VectorizedEnv` to spawn multiple agents with their own copy 
+        of the environment. Defaults to 1.
+        eval_envs (Union[List[str], List[gym.Env]], optional): List of env ids to use during evaluation. If None is passed, train environments will be used for evaluation.
+        n_experiences ([type], optional): Number of experiences to generate with the provided envs. If greater than number of envs, envs will be looped through. Defaults to number of envs.
+        frame_stacking (bool, optional): Enables frame stacking of the last 4 consecutive frames. Defaults to True.
+        normalize_observations (bool, optional): Returns normalized [0-1] float32 observations. Defaults to False.
+        terminal_on_life_loss (bool, optional): if True, then step() returns done=True whenever a life is lost. Defaults to False.
+        clip_reward (bool, optional): Clips rewards to their sign (-1, 0, +1). Defaults to False.
+        extra_wrappers (List[Wrapper], optional): List of wrapper classes to instantiate *after* the common atari wrappers. Defaults to [].
+
+    Returns:
+        RLScenario: Scenario with `train` and `test` experience stream containing specified atari environments.
+    """
     # setup atari specific env wrappers
     wrappers = [
         lambda
@@ -123,7 +183,7 @@ def atari_benchmark_generator(
 
     if frame_stacking:
         # TODO: consider https://github.com/openai/gym/blob/master/gym/wrappers/frame_stack.py
-        from gym.wrappers.frame_stack import FrameStack
+        # for memory efficiency but must change interacting code 
         wrappers.append(FrameStackingWrapper)
         # wrappers.append(lambda env: FrameStack(env, num_stack=4))
     wrappers.extend(extra_wrappers)
@@ -158,6 +218,7 @@ if importlib.util.find_spec('continual_habitat_lab') is not None and importlib.u
             # eval_config: ContinualHabitatLabConfig = None, 
             max_steps_per_experience: int = 1000,
             change_experience_on_scene_change: bool = False,
+            time_limit_tasks: Union[int, List[int]] = None,
             *args, **kwargs) -> Tuple[RLScenario, List[Timestep]]:
 
         # number of experiences as the number of tasks defined in configuration

@@ -1,3 +1,4 @@
+from gym.core import Wrapper
 import ray
 import gym
 from typing import Callable, List, Union, Dict, Any
@@ -20,7 +21,8 @@ class Actor:
         if isinstance(env, gym.Env):
             self.env = env
         else:
-            self.env: gym.Env = env(env_kwargs)
+            self.env: gym.Env = env(**env_kwargs)
+        # print("Actor env", self.env, id(self.env), self.env.reset().shape)
 
         self.id = actor_id
         # allows you to have batches of fixed size independently of episode termination
@@ -38,7 +40,7 @@ class Actor:
         """
         # try casting to numpy array
         # if type(action) is not np.ndarray:
-            # action = np.array(action)
+        # action = np.array(action)
 
         next_obs, reward, done, info = self.env.step(action)
         # auto-reset episode: obs you get is actually the first of the new episode, 
@@ -67,52 +69,40 @@ class Actor:
         return self.env.seed(seed)
 
     def environment(self):
-        # for degub purpose, you shouldn't need to call this method as it copies over the env
+        # mostly for degub purpose, you shouldn't need to call this method
         return self.env
 
-def clone_wrapped_atari_env(env: gym.Wrapper, n_copies: int)->List[gym.Wrapper]:
-    """
-        Clone atari env by re-making unwrapped environment, copying only 'empty' wrappers
-        while re-assigning object references.
-    """
-    original_env = env
-    game_id = env.spec.id
 
-    wrappers = []
-    env_name = original_env.__class__.__name__
-    while env_name != 'TimeLimit' and env_name != 'AtariEnv':
-        wrappers.append(original_env)
-        original_env = original_env.env
-        env_name = original_env.__class__.__name__
-    # defer env pointer
-    wrappers[-1].env = None
-    envs = []
-    for _ in range(n_copies):
-        wrappers_copy = deepcopy(wrappers)
-        unwrapped_env = gym.make(game_id)
+def make_actor_atari_env(
+        env_id: str, wrappers: List[Wrapper],
+        atari_state: np.ndarray):
+    from avalanche.benchmarks.generators.rl_benchmark_generators import make_env
 
-        wrappers_copy[-1].env = unwrapped_env
+    # ray shared arrays are read-only objects https://docs.ray.io/en/master/serialization.html#numpy-arrays
+    # we need to clone state in actors local memory because of `restore_full_state` which uses `as_ctypes`
+    # to convert state which in turn requires the array to be writeable
+    state = np.zeros_like(atari_state, dtype=atari_state.dtype)
+    state[:] = atari_state
+    env = make_env(env_id, wrappers=wrappers)
+    env.unwrapped.restore_full_state(state)
 
-        for i in range(len(wrappers_copy)-2, -1, -1):
-            wrappers_copy[i].env = wrappers_copy[i+1]
-        envs.append(wrappers_copy[0])
-    return envs
+    return env
 
 
 class VectorizedEnvironment(object):
     """
     Vectorized Environment inspired by https://stable-baselines3.readthedocs.io/en/master/guide/vec_envs.html,
     realized using `ray` as backend for multi-agent parallel environment interaction.
-    Only supports numpy array to avoid facilitate object passing in distributed setting.
-
+    Only supports numpy-based interface to facilitate object passing in distributed setting.
     """
 
     def __init__(
             self, envs: Union[Callable[[Dict[Any, Any]], gym.Env], List[gym.Env], gym.Env],
             n_envs: int, env_kwargs=dict(), auto_reset: bool = True,
+            wrappers_generators: List[Callable[[Any], Wrapper]] = None,
             ray_kwargs={'num_cpus': multiprocessing.cpu_count()}
             ) -> None:
-        # Avoid passing over potentially big objects on the net, prefer creating 
+        # Avoid passing over potentially big objects on the network, prefer creating 
         # env locally to each actor
         assert n_envs > 0, "Cannot initialize a VectorizedEnv with a non-positive number of environments"
         ray.init(ignore_reinit_error=True, **ray_kwargs)
@@ -122,25 +112,40 @@ class VectorizedEnvironment(object):
             self.env = envs(**env_kwargs)
             envs = [envs for _ in range(n_envs)]
         elif isinstance(envs, gym.Env):
-            # FIXME: this is probably why a2c didnt work, ref to same object
-            # deepcopy isn't guaranteed to work with atari envs
-            if 'atari' in envs.spec.entry_point:
-                envs = clone_wrapped_atari_env(envs, n_envs+1)
+            # avoid reference to same object, make sure each actor gets own environment
+            # deepcopy isn't guaranteed to work with (wrapped) atari envs
+            if hasattr(envs.spec, 'entry_point') and 'atari' in envs.spec.entry_point:
+                # copy kept in local for accessing env spec/attrs using this class
+                self.env = envs
+                env_id = envs.spec.id
+                atari_state = envs.unwrapped.clone_full_state()
+
+                # actor will instatiate environment locally
+                envs = [make_actor_atari_env for _ in range(n_envs)]
+
+                # atari games do not accept env kwargs on creation, so we just leverage env_kwargs
+                env_kwargs = dict(
+                    env_id=env_id, wrappers=wrappers_generators,
+                    atari_state=atari_state)
             else:
-                envs = [deepcopy(envs) for _ in range(n_envs+1)]
-            # copy kept in local for accessing env spec/attrs using this class
-            self.env = envs.pop()
+                self.env = envs
+                envs = [deepcopy(envs) for _ in range(n_envs)]
         elif type(envs) is list:
             assert len(envs) == n_envs
-            # FIXME: ref to same object
-            self.env = envs[0]
-            # envs = [lambda _ : envs[i] for i in range(n_envs)]
+            if hasattr(envs.spec, 'entry_point') and 'atari' in envs.spec.entry_point:
+                raise NotImplementedError('Passing a list of Atari envs is currently not supported')
+            else:
+                self.env = deepcopy(envs[0])
+        
+        self.action_space = self.env.action_space
+        # re-define observation space
+        self.observation_space = self.env.observation_space
+        self.observation_space.shape = (n_envs, *self.observation_space.shape)
 
-        # FIXME: actor needs to instantiate env locally or we get a corruction error
-        self.actors = [Actor.remote(
-                           envs[i],
-                           i, env_kwargs, auto_reset=auto_reset)
-                       for i in range(n_envs)]
+        # NOTE: actor needs to instantiate env locally or we get a double free corruction error (?)
+        self.actors = [
+            Actor.remote(envs[i], i, env_kwargs, auto_reset=auto_reset)
+            for i in range(n_envs)]
 
     def _remote_vec_calls(self, fname: str, *args, **kwargs) -> Union[np.ndarray, List[Any]]:
         promises = [getattr(actor, fname).remote(*args, **kwargs)
@@ -149,6 +154,7 @@ class VectorizedEnvironment(object):
 
     def __getattr__(self, attr: str):
         if hasattr(self.env, attr):
+            # for action space, reward range..
             return getattr(self.env, attr)
         else:
             raise AttributeError(attr)

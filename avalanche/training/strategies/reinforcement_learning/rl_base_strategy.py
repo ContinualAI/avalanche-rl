@@ -9,7 +9,7 @@ from typing import Union, Optional, Sequence, List, Tuple
 from dataclasses import dataclass
 import numpy as np
 from avalanche.training.plugins.strategy_plugin import StrategyPlugin
-from avalanche.training.strategies.reinforcement_learning.utils import *
+from avalanche.training.strategies.reinforcement_learning.env_wrappers import *
 from avalanche.training import default_rl_logger
 import enum
 from avalanche.training.strategies.reinforcement_learning.vectorized_env import VectorizedEnvironment
@@ -128,11 +128,12 @@ class RLBaseStrategy(BaseStrategy):
         self.eval_episodes = eval_episodes
 
     @property
-    def current_experience_steps(self)->Timestep:
+    def current_experience_steps(self) -> Timestep:
         """
             Return number of steps to perform for current experience (only valid during training).
         """
-        return self.per_experience_steps[self.experience.current_experience%len(self.per_experience_steps)]
+        return self.per_experience_steps[self.experience.current_experience %
+                                         len(self.per_experience_steps)]
 
     # Additional callback added by RLBaseStrategy
     def before_rollout(self, **kwargs):
@@ -248,7 +249,8 @@ class RLBaseStrategy(BaseStrategy):
             cpus = min(self.n_envs, multiprocessing.cpu_count())
             env = VectorizedEnvironment(
                 self.environment, self.n_envs, auto_reset=True,
-                ray_kwargs={'num_cpus': cpus})
+                wrappers_generators=self.experience.scenario.
+                _wrappers_generators[self.environment.spec.id], ray_kwargs={'num_cpus': cpus})
         # NOTE: `info['terminal_observation']`` is NOT converted to tensor 
         return Array2Tensor(env)
 
@@ -314,7 +316,7 @@ class RLBaseStrategy(BaseStrategy):
                 env=self.environment, n_rollouts=self.rollouts_per_step,
                 max_steps=self.max_steps_per_rollout)
             self.after_rollout(**kwargs)
-            
+
             for self.update_step in range(self.updates_per_step):
                 # update must instatiate `self.loss`
                 self.update(self.rollouts)
@@ -338,7 +340,8 @@ class RLBaseStrategy(BaseStrategy):
         self.environment.close()
 
         # Final evaluation
-        self._periodic_eval(eval_streams, do_final=(self.timestep % self.eval_every != 0))
+        self._periodic_eval(eval_streams, do_final=(
+            self.timestep % self.eval_every != 0))
         self.after_training_exp(**kwargs)
 
     def _periodic_eval(self, eval_streams, do_final):
@@ -417,7 +420,9 @@ class RLBaseStrategy(BaseStrategy):
             for t in count():
                 # this may get stuck with games such as breakout and deterministic dqn
                 # if we let no op action be selected indefinitely 
-                action = self.model.get_action(obs.unsqueeze(0).to(self.device), task_label=self.experience.task_label)
+                action = self.model.get_action(
+                    obs.unsqueeze(0).to(self.device),
+                    task_label=self.experience.task_label)
                 obs, reward, done, info = self.environment.step(action.item())
                 # TODO: use info
                 self.eval_rewards['past_returns'][ep_no] += reward
@@ -430,7 +435,8 @@ class RLBaseStrategy(BaseStrategy):
         self.environment.reset()
         self.environment.close()
 
-    def _model_forward(self, model:nn.Module, observations: torch.Tensor, *args, **kwargs):
+    def _model_forward(self, model: nn.Module, observations: torch.Tensor, *
+                       args, **kwargs):
         """Method for handling forward passage of model handling task label retrieval.
         Args:
             model (nn.Module): Pytorch model to feed observations to.
@@ -439,7 +445,7 @@ class RLBaseStrategy(BaseStrategy):
             Model output.
         """
 
-        exp:RLExperience = getattr(self, 'experience', None)
+        exp: RLExperience = getattr(self, 'experience', None)
 
         task_label = None
         if exp is not None:

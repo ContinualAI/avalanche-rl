@@ -1,6 +1,6 @@
 from avalanche.benchmarks.scenarios.generic_definitions import Experience
 from avalanche.benchmarks.scenarios.generic_cl_scenario import TGenericScenarioStream, GenericScenarioStream, TGenericCLScenario, Iterable, GenericCLScenario, GenericExperience
-from gym.core import Env
+from gym import Env, Wrapper
 from typing import Callable, Dict, Union, Optional, Sequence, Any, List
 import random
 import numpy as np
@@ -29,6 +29,7 @@ class RLScenario(GenericCLScenario['RLExperience']):
                  n_experiences: int,
                  n_parallel_envs: Union[int, List[int]],
                  eval_envs: Union[List[Env], List[Callable[[], Env]]],
+                 wrappers_generators: Dict[str, List[Wrapper]]=None,
                  task_labels: bool = True,
                  shuffle: bool = False, 
                  seed: Optional[int] = None):
@@ -43,6 +44,8 @@ class RLScenario(GenericCLScenario['RLExperience']):
         self.n_envs = n_parallel_envs
         self.train_task_labels = list(range(len(envs)))
         self.eval_task_labels = list(range(len(eval_envs)))
+        # keep track of environment wrappers
+        self._wrappers_generators = wrappers_generators
 
         if n_experiences < len(self.envs):
             self.envs = self.envs[:n_experiences]
@@ -60,7 +63,7 @@ class RLScenario(GenericCLScenario['RLExperience']):
             torch.manual_seed(seed)
 
         if shuffle:
-            perm = random.shuffle(list(range(len(self.envs))))
+            perm = np.random.permutation(self.envs)
             self.envs = [self.envs[i] for i in perm]
             self.train_task_labels = [self.train_task_labels[i] for i in perm]
 
