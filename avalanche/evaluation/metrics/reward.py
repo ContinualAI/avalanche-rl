@@ -7,7 +7,8 @@ import numpy as np
 
 class MovingWindowedStat(PluginMetric[float]):
     def __init__(self, window_size: int, stat: str = 'mean',
-                 name: str = 'Moving Windowed Stat'):
+                 name: str = 'Moving Windowed Stat', mode='train'):
+        assert mode in ['train', 'eval']
         stat = stat.lower()
         assert stat in ['mean', 'max', 'min', 'std', 'sum']
         self._stat = stat
@@ -16,6 +17,7 @@ class MovingWindowedStat(PluginMetric[float]):
         super().__init__()
         self.x_coord = 0
         self.name = name
+        self._mode = mode
 
     def result(self) -> float:
         if self._stat == 'mean':
@@ -32,7 +34,13 @@ class MovingWindowedStat(PluginMetric[float]):
         if self._stat == 'sum':
             return np.sum(self._moving_window.window)
 
+    def update(self, strategy: 'BaseStrategy'):
+        raise NotImplementedError()
+
     def emit(self):
+        # TODO: only emit once we have completed at least one episode (e.g. we have one return)?
+        # you must emit at every timestep or you can't figure out experience lenght when gathering 
+        # with `get_all_metrics`, that's not great
         values = self.result()
         self.x_coord += 1
         return [MetricValue(self, str(self), values, self.x_coord)]
@@ -44,84 +52,101 @@ class MovingWindowedStat(PluginMetric[float]):
         self._moving_window.reset()
 
     def __str__(self) -> str:
-        return f'{self._stat[0].upper()+self._stat[1:].lower()} {self.name} ({self.window_size} steps)'
+        def camelcase(s: str):
+            return s[0].upper() + s[1:].lower()
+        return f'[{camelcase(self._mode)}] {camelcase(self._stat)} {self.name} ({self.window_size} episodes)'
 
 
-def moving_window_stat(metric: str, window_size: int = 10, stats=['mean']) -> List[PluginMetric]:
+def moving_window_stat(
+        metric: str, window_size: int = 10, stats=['mean'],
+        mode='train') -> List[PluginMetric]:
     metric = metric.lower()
     assert metric in ['reward', 'ep_length']
-    if metric == 'reward':
-        return list(map(lambda s: RewardPluginMetric(window_size, s), stats))
-    elif metric == 'ep_length':
-        return list(map(lambda s: EpLenghtPluginMetric(window_size, s), stats))
+    if mode == 'any':
+        mode = ['train', 'eval']
+    else:
+        mode = [mode]
+    metrics = []
+    for m in mode:
+        if metric == 'reward':
+            metrics += list(map(lambda s: ReturnPluginMetric(window_size, s, mode=m), stats))
+        elif metric == 'ep_length':
+            metrics += list(map(lambda s: EpLenghtPluginMetric(window_size, s, mode=m), stats))
+    return metrics
 
 
-class RewardPluginMetric(MovingWindowedStat):
+class ReturnPluginMetric(MovingWindowedStat):
     """
         Keep track of sum of rewards (returns) per episode.
     """
 
-    def __init__(self, window_size: int, stat: str = 'mean', name: str = 'Reward', *args, **kwargs):
-        super().__init__(window_size, stat=stat, name=name, *args, **kwargs)
+    def __init__(
+            self, window_size: int, stat: str = 'mean', name: str = 'Reward',
+            mode: str = 'train'):
+        super().__init__(window_size, stat=stat, name=name, mode=mode)
 
-    def update(self, strategy, is_eval: bool):
-        rewards = strategy.eval_rewards if is_eval else strategy.rewards 
+    def update(self, strategy):
+        rewards = strategy.eval_rewards if self._mode == 'eval' else strategy.rewards 
         for return_ in rewards['past_returns']:
             self._moving_window.update(return_)
 
-    def before_training_exp(self, strategy: 'BaseStrategy') -> 'MetricResult':
-        # reset on new experience
-        self.reset()
-
     # Train
+    def before_training_exp(self, strategy: 'BaseStrategy') -> 'MetricResult':
+        if self._mode == 'train':
+            # reset on new experience
+            self.reset()
+
     def after_rollout(self, strategy) -> None:
-        self.update(strategy, False)
-        return self.emit()
+        if self._mode == 'train':
+            self.update(strategy)
+            return self.emit()
 
     # Eval
     def before_eval_exp(self, strategy: 'BaseStrategy') -> MetricResult:
-        self.reset()
+        if self._mode == 'eval':
+            self.reset()
 
     def after_eval_exp(self, strategy: 'BaseStrategy') -> MetricResult:
-        self.update(strategy, True)
-        return self.emit()
-
-    def after_eval(self, strategy: 'BaseStrategy') -> 'MetricResult':
-        self.reset()
+        if self._mode == 'eval':
+            self.update(strategy)
+            # in eval we always complete at least one episode
+            return self.emit()
 
 
 class EpLenghtPluginMetric(MovingWindowedStat):
 
-    def __init__(self, window_size: int, stat: str = 'mean', name: str = 'Episode Length', *args, **kwargs):
-        super().__init__(window_size, stat=stat, name=name, *args, **kwargs)
+    def __init__(self, window_size: int, stat: str = 'mean',
+                 name: str = 'Episode Length', mode='train'):
+        super().__init__(window_size, stat=stat, name=name, mode=mode)
 
-    def update(self, strategy, is_eval: bool):
+    def update(self, strategy):
         # iterate over parallel envs episodes
-        lengths = strategy.eval_ep_lengths if is_eval else strategy.ep_lengths 
+        lengths = strategy.eval_ep_lengths if self._mode == 'eval' else strategy.ep_lengths 
         for _, ep_lengths in lengths.items():
             for ep_len in ep_lengths: 
                 self._moving_window.update(ep_len)
+
     # TODO: we could use same system GenericFloatMetric to specify reset callbacks
-
-    def before_training_exp(self, strategy: 'BaseStrategy') -> 'MetricResult':
-        # reset on new experience
-        self.reset()
-
     # Train
+    def before_training_exp(self, strategy: 'BaseStrategy') -> 'MetricResult':
+        if self._mode == 'train':
+            # reset on new experience
+            self.reset()
+
     def after_rollout(self, strategy) -> None:
-        self.update(strategy, False)
-        return self.emit()
+        if self._mode == 'train':
+            self.update(strategy)
+            return self.emit()
 
     # Eval
     def before_eval_exp(self, strategy: 'BaseStrategy') -> MetricResult:
-        self.reset()
+        if self._mode == 'eval':
+            self.reset()
 
     def after_eval_exp(self, strategy: 'BaseStrategy') -> MetricResult:
-        self.update(strategy, True)
-        return self.emit()
-
-    def after_eval(self, strategy: 'BaseStrategy') -> 'MetricResult':
-        self.reset()
+        if self._mode == 'eval':
+            self.update(strategy)
+            return self.emit()
 
 
 class GenericFloatMetric(PluginMetric[float]):

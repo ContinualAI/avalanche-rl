@@ -214,7 +214,6 @@ class RLBaseStrategy(BaseStrategy):
                 self.rewards['past_returns'].append(
                     self.rewards['curr_returns'][env_done])
                 self.rewards['curr_returns'][env_done] = 0.
-                # print(self.rollout_steps, self.ep_lengths)
 
             # Vectorized env auto resets on done by default, check this flag to count episodes
             if n_rollouts > 0:
