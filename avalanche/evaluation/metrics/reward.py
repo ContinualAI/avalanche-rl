@@ -5,26 +5,37 @@ from typing import Dict, Union, List
 import numpy as np
 
 
-class MovingWindowedStatsPluginMetric(PluginMetric[List[float]]):
-
-    def __init__(
-            self, window_size: int, name: str = 'Moving Windowed Stats',
-            stats=['mean']):
-        assert len(stats) > 0
+class MovingWindowedStat(PluginMetric[float]):
+    def __init__(self, window_size: int, stat: str = 'mean',
+                 name: str = 'Moving Windowed Stat'):
+        stat = stat.lower()
+        assert stat in ['mean', 'max', 'min', 'std', 'sum']
+        self._stat = stat
         self._moving_window = WindowedMovingAverage(window_size)
         self.window_size = window_size
         super().__init__()
         self.x_coord = 0
-        self.stats = stats
         self.name = name
+
+    def result(self) -> float:
+        if self._stat == 'mean':
+            return self._moving_window.result()
+        if self._stat == 'max':
+            return np.amax(self._moving_window.window, initial=np.float('-inf'))
+        if self._stat == 'min':
+            return np.amin(self._moving_window.window, initial=np.float('-inf'))
+        if self._stat == 'std':
+            if len(self._moving_window.window):
+                return np.std(self._moving_window.window)
+            else:
+                return 0.
+        if self._stat == 'sum':
+            return np.sum(self._moving_window.window)
 
     def emit(self):
         values = self.result()
         self.x_coord += 1
         return [MetricValue(self, str(self), values, self.x_coord)]
-
-    def update(self, strategy):
-        raise NotImplementedError()
 
     def reset(self) -> None:
         """
@@ -32,49 +43,26 @@ class MovingWindowedStatsPluginMetric(PluginMetric[List[float]]):
         """
         self._moving_window.reset()
 
-    def result(self) -> List[float]:
-        """
-        Emit the result
-        """
-        values = []
-        for stat in self.stats:
-            if 'mean' == stat:
-                values.append(self._moving_window.result())
-            if 'max' == stat:
-                values.append(
-                    np.amax(
-                        self._moving_window.window, initial=np.float('-inf')))
-            if 'min' == stat:
-                values.append(
-                    np.amin(
-                        self._moving_window.window, initial=np.float('-inf')))
-            if 'std' == stat:
-                if len(self._moving_window.window):
-                    values.append(np.std(self._moving_window.window))
-                else:
-                    values.append(0.)
-            if 'sum' == stat:
-                values.append(np.sum(self._moving_window.window))
-        return values
-
     def __str__(self) -> str:
-        s = ""
-        for stats in self.stats:
-            s += f"{stats[0].upper()+stats[1:]}/"
-        s = s[:-1] + f" {self.name}" 
-        s += f' ({self.window_size} steps)'
-        return s 
+        return f'{self._stat[0].upper()+self._stat[1:].lower()} {self.name} ({self.window_size} steps)'
 
 
-class RewardPluginMetric(MovingWindowedStatsPluginMetric):
+def moving_window_stat(metric: str, window_size: int = 10, stats=['mean']) -> List[PluginMetric]:
+    metric = metric.lower()
+    assert metric in ['reward', 'ep_length']
+    if metric == 'reward':
+        return list(map(lambda s: RewardPluginMetric(window_size, s), stats))
+    elif metric == 'ep_length':
+        return list(map(lambda s: EpLenghtPluginMetric(window_size, s), stats))
+
+
+class RewardPluginMetric(MovingWindowedStat):
     """
         Keep track of sum of rewards (returns) per episode.
     """
 
-    def __init__(
-            self, window_size: int, name: str = 'Reward', *args,
-            **kwargs):
-        super().__init__(window_size, name=name, *args, **kwargs)
+    def __init__(self, window_size: int, stat: str = 'mean', name: str = 'Reward', *args, **kwargs):
+        super().__init__(window_size, stat=stat, name=name, *args, **kwargs)
 
     def update(self, strategy, is_eval: bool):
         rewards = strategy.eval_rewards if is_eval else strategy.rewards 
@@ -102,10 +90,10 @@ class RewardPluginMetric(MovingWindowedStatsPluginMetric):
         self.reset()
 
 
-class EpLenghtPluginMetric(MovingWindowedStatsPluginMetric):
+class EpLenghtPluginMetric(MovingWindowedStat):
 
-    def __init__(self, window_size: int, name: str = 'Episode Length', *args, **kwargs):
-        super().__init__(window_size, name=name, *args, **kwargs)
+    def __init__(self, window_size: int, stat: str = 'mean', name: str = 'Episode Length', *args, **kwargs):
+        super().__init__(window_size, stat=stat, name=name, *args, **kwargs)
 
     def update(self, strategy, is_eval: bool):
         # iterate over parallel envs episodes
@@ -113,6 +101,7 @@ class EpLenghtPluginMetric(MovingWindowedStatsPluginMetric):
         for _, ep_lengths in lengths.items():
             for ep_len in ep_lengths: 
                 self._moving_window.update(ep_len)
+    # TODO: we could use same system GenericFloatMetric to specify reset callbacks
 
     def before_training_exp(self, strategy: 'BaseStrategy') -> 'MetricResult':
         # reset on new experience
@@ -139,7 +128,8 @@ class GenericFloatMetric(PluginMetric[float]):
     # Logs output of a simple float value without many bells and whistles 
 
     def __init__(self, metric_variable_name: str, name: str,
-                 reset_value: float = None, emit_on=['after_rollout'], update_on=['after_rollout']):
+                 reset_value: float = None, emit_on=['after_rollout'],
+                 update_on=['after_rollout']):
         super().__init__()
         self.metric_name = metric_variable_name
         self.name = name

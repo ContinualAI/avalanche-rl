@@ -77,6 +77,7 @@ class WindowedMovingAverage(Metric[float]):
         assert window_size > 0, "Window size cannot be negative"
         super().__init__()
         self.window:List[float] = []
+        # useful to compute additional stats on window
         self.window_size = window_size
 
     def update(self, value: SupportsFloat):

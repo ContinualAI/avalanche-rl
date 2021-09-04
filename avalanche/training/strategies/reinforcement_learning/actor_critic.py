@@ -38,8 +38,6 @@ class A2CStrategy(RLBaseStrategy):
         for exp_step in self.per_experience_steps:
             exp_step.unit == TimestepUnit.STEPS, 'A2C only supports expressing training duration in steps not episodes'
 
-        self.model = model
-        self.optimizer = optimizer
         self.value_criterion = value_criterion
         self.ac_w = policy_loss_weight
         self.cr_w = value_loss_weight
@@ -91,7 +89,7 @@ class A2CStrategy(RLBaseStrategy):
             # print("Rollout adv shape", advantages.shape, log_prob.shape, policy_logits.shape)
             policy_loss = -(advantages * log_prob).mean()
 
-            # Value Loss Term: R_t + gamma * V(S_{t+1}) - V(S_t)
+            # Value Loss Term: (R_t + gamma * V(S_{t+1}) - V(S_t))^2
             # value_loss = advantages.pow(2)
             value_loss = self.value_criterion(boostrapped_returns, values)
 
