@@ -73,3 +73,74 @@ class ConvDeepQN(DQNModel):
             x = self.conv3(x)
         print("Size of flattened input to fully connected layer:", x.flatten().shape)
         return x.squeeze(0).flatten().shape[0]
+
+
+class EWCConvDeepQN(DQNModel):
+    """Model used in the original EWC paper https://arxiv.org/abs/1612.00796.
+        It is a variant of the original DQN with added task-specific biases and gains. 
+    """
+    def __init__(self, input_channels, image_shape, n_actions, n_tasks, bias=False):
+        super().__init__()
+
+        self.conv1 = nn.Conv2d(input_channels, 32, 8, stride=4, bias=bias)
+        self.conv2 = nn.Conv2d(32, 64, 4, stride=2, bias=bias)
+        self.conv3 = nn.Conv2d(64, 128, 3, stride=1, bias=bias)
+        shapes = self._compute_shapes(
+            (input_channels, image_shape[0], image_shape[1]))
+
+        # bias/gain are game-specific and are initialized as in the paper
+        for layer in range(1, 4):
+            for task in range(n_tasks):
+                setattr(self, f'bias{layer}_{task}', nn.parameter.Parameter(torch.zeros(*shapes[layer-1])))
+                setattr(self, f'gain{layer}_{task}', nn.parameter.Parameter(torch.ones(*shapes[layer-1])))
+
+        # fully connected part
+        self.l1 = nn.Linear(shapes[-1], 1024, bias=bias)
+        self.l2 = nn.Linear(1024, n_actions, bias=bias)
+
+        # linear layers biases & gains
+        fc_sizes = [1024, n_actions]
+        for layer in range(1, 3):
+            for task in range(n_tasks):
+                setattr(self, f'bias_l{layer}_{task}', nn.parameter.Parameter(torch.zeros(fc_sizes[layer-1],)))
+                setattr(self, f'gain_l{layer}_{task}', nn.parameter.Parameter(torch.ones(fc_sizes[layer-1])))
+
+
+    def forward(self, x: torch.Tensor, task_label=None) -> torch.Tensor:
+        # biases and gains are game-specific: select them using task label
+        for i in range(1, 4):
+            x = getattr(self, f'conv{i}')(x)
+            task_bias = getattr(self, f'bias{i}_{task_label}')
+            gain = getattr(self, f'gain{i}_{task_label}')
+            # print('conv shape', x.shape, task_bias.shape)
+            x += task_bias
+            x *= gain
+            # torch.add(x, bias, alpha=gains)?
+            x = F.relu(x)
+
+        # feed to fc layer
+        x = x.flatten(1)
+
+        x = self.l1(x)
+        x += getattr(self, f'bias_l1_{task_label}')
+        x *= getattr(self, f'gain_l1_{task_label}')
+        x = F.relu(x)
+
+        x = self.l2(x)
+        x += getattr(self, f'bias_l2_{task_label}')
+        x *= getattr(self, f'gain_l2_{task_label}')
+
+        return x
+
+    def _compute_shapes(self, input_shape):
+        # returns activation maps sizes at each layer for adding biases & gains
+        x = torch.zeros(input_shape)
+        x = x.unsqueeze(0)
+        with torch.no_grad():
+            x = self.conv1(x)
+            s1 = x.shape[2:]
+            x = self.conv2(x)
+            s2 = x.shape[2:]
+            x = self.conv3(x)
+            s3 = x.shape[2:]
+        return s1, s2, s3, x.squeeze(0).flatten().shape[0]

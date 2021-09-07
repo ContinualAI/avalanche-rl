@@ -45,6 +45,7 @@ class DQNStrategy(RLBaseStrategy):
             device='cpu',
             plugins: Optional[Sequence[StrategyPlugin]] = [],
             reset_replay_on_new_experience: bool = True,
+            initial_replay_memory:ReplayMemory=None,
             eval_every: int = -1, eval_episodes: int = 1, evaluator=default_dqn_logger):
         super().__init__(model, optimizer, per_experience_steps,
                          criterion=criterion, rollouts_per_step=rollouts_per_step,
@@ -58,9 +59,10 @@ class DQNStrategy(RLBaseStrategy):
         for exp_step in self.per_experience_steps:
             assert target_net_update_interval.unit == exp_step.unit, "You must express the target network interval using the same unit as the training lenght"
 
-        self.replay_memory: ReplayMemory = None
+        self.replay_memory: ReplayMemory = initial_replay_memory
         self.replay_init_size = replay_memory_init_size
-        self.replay_size = replay_memory_size
+        # if replay memory is initialized externally, ignore `replay_memory_size`
+        self.replay_size = replay_memory_size if initial_replay_memory is None else initial_replay_memory.size
         self.batch_dim = batch_size
         self.double_dqn = double_dqn
         self.target_net_update_interval: Timestep = target_net_update_interval
@@ -111,9 +113,11 @@ class DQNStrategy(RLBaseStrategy):
         rollouts = self.rollout(
             self.environment, n_rollouts=-1, max_steps=self.replay_init_size //
             self.n_envs)
-        if self.replay_memory is None or self.reset_replay:
+        if self.replay_memory is None:
             self.replay_memory = ReplayMemory(
                 size=self.replay_size, n_envs=self.n_envs)
+        elif self.training_exp_counter>0 and self.reset_replay:
+            self.replay_memory.reset()
 
         self.replay_memory.add_rollouts(rollouts)
 

@@ -83,7 +83,7 @@ class WindowedMovingAverage(Metric[float]):
     def update(self, value: SupportsFloat):
         value = float(value)
         self.window.append(value)
-        if len(self.window) >= self.window_size:
+        if len(self.window) > self.window_size:
             self.window = self.window[1:]
 
     def result(self)->float:

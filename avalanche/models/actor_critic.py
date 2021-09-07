@@ -45,11 +45,11 @@ class ActorCriticMLP(A2CModel):
         critic = [nn.Linear(
                       critic_hidden_sizes[i],
                       critic_hidden_sizes[i + 1])
-                  for i in range(1, len(critic_hidden_sizes) - 1)]
+                  for i in range(len(critic_hidden_sizes) - 1)]
         actor = [
             nn.Linear(actor_hidden_sizes[i],
                       actor_hidden_sizes[i + 1])
-            for i in range(1, len(actor_hidden_sizes) - 1)]
+            for i in range(len(actor_hidden_sizes) - 1)]
 
         # self.critic_linear2 = nn.Linear(hidden_size, 1)
         self.critic = []

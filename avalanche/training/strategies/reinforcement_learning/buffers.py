@@ -262,5 +262,9 @@ class ReplayMemory:
         return Rollout([self._memory[i] for i in np.random.choice(len(self), size=batch_dim, replace=False)], n_envs=-1).to(device)
         # return Rollout(np.random.choice(self._memory, size=batch_dim, replace=False).tolist(), n_envs=-1).to(device)
 
+    def reset(self):
+        self._memory = []
+        self.steps_counter = 0
+
     def __len__(self):
         return len(self._memory)

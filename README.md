@@ -98,11 +98,12 @@ for experience in scenario.train_stream:
 ```
 Compare it with [vanilla Avalanche snippet](https://avalanche.continualai.org/)!
 
-Check out more examples [here](https://github.com/NickLucche/avalanche/blob/master/examples/reinforcement_learning/) (soon more advanced ones) or in unit tests.
+Check out more examples [here](https://github.com/NickLucche/avalanche/blob/master/examples/reinforcement_learning/) (advanced ones coming soon) or in unit tests. We also got a small-scale reproduction of the original EWC paper (Deepmind) [experiments](https://github.com/NickLucche/avalanche/blob/master/examples/reinforcement_learning/ewc.py).
 
 ## Installation
 ______________
 As this fork is still under development, the advised way to install it is to simply clone this repo `git clone https://github.com/NickLucche/avalanche.git` and then just follow avalanche guide to [install as developer](https://avalanche.continualai.org/getting-started/how-to-install#developer-mode-install). Spoiler, just run `conda env update --file environment-dev.yml` to update your current environment with avalanche-rl dependencies.
+Currently, the only added dependency is `ray`.
 
 Disclaimer
 ----------------

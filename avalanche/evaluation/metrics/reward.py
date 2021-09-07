@@ -74,7 +74,7 @@ def moving_window_stat(
             metrics += list(map(lambda s: EpLenghtPluginMetric(window_size, s, mode=m), stats))
     return metrics
 
-
+# TODO: immediate reward metric
 class ReturnPluginMetric(MovingWindowedStat):
     """
         Keep track of sum of rewards (returns) per episode.
