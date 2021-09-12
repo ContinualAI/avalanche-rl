@@ -1,3 +1,4 @@
+from collections import defaultdict
 from avalanche.evaluation.metric_definitions import GenericPluginMetric, PluginMetric, MetricValue
 from avalanche.evaluation.metric_results import MetricResult
 from avalanche.evaluation.metrics.mean import WindowedMovingAverage, Mean
@@ -84,10 +85,21 @@ class ReturnPluginMetric(MovingWindowedStat):
             self, window_size: int, stat: str = 'mean', name: str = 'Reward',
             mode: str = 'train'):
         super().__init__(window_size, stat=stat, name=name, mode=mode)
+        self._last_returns_len = 0
 
     def update(self, strategy):
         rewards = strategy.eval_rewards if self._mode == 'eval' else strategy.rewards 
-        for return_ in rewards['past_returns']:
+        # for efficiency, only loop through last *not seen* `window_size` returns (full episodes) 
+        new_returns = self._moving_window.window_size
+        if self._mode == 'train':
+            new_returns = len(rewards['past_returns'])-self._last_returns_len
+            if new_returns==0:
+                # no episode finished since last update
+                return
+            new_returns = min(new_returns, self._moving_window.window_size)
+            self._last_returns_len = len(rewards['past_returns'])
+
+        for return_ in rewards['past_returns'][-new_returns:]:
             self._moving_window.update(return_)
 
     # Train
@@ -95,6 +107,7 @@ class ReturnPluginMetric(MovingWindowedStat):
         if self._mode == 'train':
             # reset on new experience
             self.reset()
+            self._last_returns_len = 0
 
     def after_rollout(self, strategy) -> None:
         if self._mode == 'train':
@@ -118,12 +131,21 @@ class EpLenghtPluginMetric(MovingWindowedStat):
     def __init__(self, window_size: int, stat: str = 'mean',
                  name: str = 'Episode Length', mode='train'):
         super().__init__(window_size, stat=stat, name=name, mode=mode)
+        self._actor_ep_lengths = defaultdict(lambda: 0)
 
     def update(self, strategy):
-        # iterate over parallel envs episodes
         lengths = strategy.eval_ep_lengths if self._mode == 'eval' else strategy.ep_lengths 
-        for _, ep_lengths in lengths.items():
-            for ep_len in ep_lengths: 
+        new_ep_lengths = self._moving_window.window_size
+        # iterate over parallel envs episodes (actor_id->ep_lengths)
+        for actor_id, actor_ep_lengths in lengths.items():
+            if self._mode == 'train':
+                new_ep_lengths = len(actor_ep_lengths)-self._actor_ep_lengths[actor_id]
+                if new_ep_lengths==0:
+                    continue
+                new_ep_lengths = min(new_ep_lengths, self._moving_window.window_size)
+                self._actor_ep_lengths[actor_id] = len(actor_ep_lengths)
+
+            for ep_len in actor_ep_lengths[-new_ep_lengths:]: 
                 self._moving_window.update(ep_len)
 
     # TODO: we could use same system GenericFloatMetric to specify reset callbacks
@@ -132,6 +154,7 @@ class EpLenghtPluginMetric(MovingWindowedStat):
         if self._mode == 'train':
             # reset on new experience
             self.reset()
+            self._actor_ep_lengths = defaultdict(lambda: 0)
 
     def after_rollout(self, strategy) -> None:
         if self._mode == 'train':
