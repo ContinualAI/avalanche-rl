@@ -54,7 +54,7 @@ class MovingWindowedStat(PluginMetric[float]):
     def __str__(self) -> str:
         def camelcase(s: str):
             return s[0].upper() + s[1:].lower()
-        return f'[{camelcase(self._mode)}] {camelcase(self._stat)} {self.name} ({self.window_size} episodes)'
+        return f'[{camelcase(self._mode)}] {camelcase(self._stat)} {self.name} (last {self.window_size} steps)'
 
 
 def moving_window_stat(
@@ -150,7 +150,7 @@ class EpLenghtPluginMetric(MovingWindowedStat):
 
 
 class GenericFloatMetric(PluginMetric[float]):
-    # Logs output of a simple float value without many bells and whistles 
+    # Logs output of a simple float value without too many bells and whistles 
 
     def __init__(self, metric_variable_name: str, name: str,
                  reset_value: float = None, emit_on=['after_rollout'],

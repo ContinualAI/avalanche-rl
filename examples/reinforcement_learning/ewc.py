@@ -27,28 +27,31 @@ if __name__ == "__main__":
     # actions but the action space is unecessarily big due to action keys ordering; we then reduce the action space
     # to 3 actions and re-map LEFT-RIGHT actions so that we skip FIRE. Actions are re-mapped before the step() method is called.  
     action_space = 3
+
     def action_wrapper_class(env): return ReducedActionSpaceWrapper(
         env, action_space_dim=action_space, action_mapping={1: 2, 2: 3})
-    
+
     n_envs = 1
     # frameskipping is done in wrapper
     scenario = atari_benchmark_generator(
         ['BreakoutNoFrameskip-v4', 'PongNoFrameskip-v4'],
-        n_parallel_envs=n_envs, frame_stacking=True, normalize_observations=True,
-        terminal_on_life_loss=True, n_experiences=6,
-        extra_wrappers=[action_wrapper_class],
+        n_parallel_envs=n_envs, frame_stacking=True,
+        normalize_observations=True, terminal_on_life_loss=True,
+        n_experiences=6, extra_wrappers=[action_wrapper_class],
         eval_envs=['BreakoutNoFrameskip-v4', 'PongNoFrameskip-v4'])
 
     # let's instatiate an external replay memory
     memory_size = 10000
     memory = ReplayMemory(size=10000, n_envs=n_envs)
-    ewc_plugin = EWCRL(400., memory, mode='separate', start_ewc_after_steps=int(3e5))
+    ewc_plugin = EWCRL(400., memory, mode='separate',
+                       start_ewc_after_steps=int(3e5))
 
     # log to file
     file_logger = TextLogger(open('ewc_log.txt', 'w'))
 
     evaluator = EvaluationPlugin(
-        *default_dqn_logger.metrics, loggers=default_dqn_logger.loggers+[file_logger])
+        *default_dqn_logger.metrics, loggers=default_dqn_logger.loggers +
+        [file_logger])
 
     # here we'll have task-specific biases & gains per layer (2 since we're learning 2 games)
     model = EWCConvDeepQN(4, (84, 84), action_space, n_tasks=2, bias=True)
@@ -63,7 +66,7 @@ if __name__ == "__main__":
             super().__init__()
 
         def after_training_exp(self, strategy: DQNStrategy, **kwargs):
-            if strategy.training_exp_counter > 1 and strategy.training_exp_counter % 2 == 0:
+            if strategy.training_exp_counter % 2 == 1:
                 strategy._init_eps = strategy._init_eps / 2
 
     # adapted hyperparams from https://github.com/DLR-RM/rl-baselines3-zoo/blob/master/hyperparams/dqn.yml
@@ -80,7 +83,7 @@ if __name__ == "__main__":
         # external replay memory is automatically filled with initial size and reset on new experience
         initial_replay_memory=memory, replay_memory_init_size=4000, double_dqn=True,
         target_net_update_interval=1000, eval_every=int(5e4),
-        eval_episodes=10, evaluator=evaluator, device=device)
+        eval_episodes=4, evaluator=evaluator, device=device)
 
     # TRAINING LOOP
     print('Starting experiment...')

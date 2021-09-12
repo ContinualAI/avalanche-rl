@@ -34,7 +34,7 @@ class RLBaseStrategy(BaseStrategy):
             per_experience_steps: Union[int, Timestep, List[Timestep]],
             criterion=nn.MSELoss(),
             rollouts_per_step: int = 1, max_steps_per_rollout: int = -1,
-            updates_per_step: int = 1, device='cpu',
+            updates_per_step: int = 1, device='cpu', max_grad_norm=None,
             plugins: Optional[Sequence[StrategyPlugin]] = [],
             discount_factor: float = 0.99, evaluator=default_rl_logger,
             eval_every=-1, eval_episodes: int = 1):
@@ -126,6 +126,7 @@ class RLBaseStrategy(BaseStrategy):
         # defined by the experience
         self.n_envs: int = None
         self.eval_episodes = eval_episodes
+        self.max_grad_norm = max_grad_norm
 
     @property
     def current_experience_steps(self) -> Timestep:
@@ -249,7 +250,8 @@ class RLBaseStrategy(BaseStrategy):
             env = VectorizedEnvironment(
                 self.environment, self.n_envs, auto_reset=True,
                 wrappers_generators=self.experience.scenario.
-                _wrappers_generators[self.environment.spec.id], ray_kwargs={'num_cpus': cpus})
+                _wrappers_generators[self.environment.spec.id],
+                ray_kwargs={'num_cpus': cpus})
         # NOTE: `info['terminal_observation']`` is NOT converted to tensor 
         return Array2Tensor(env)
 
@@ -325,6 +327,11 @@ class RLBaseStrategy(BaseStrategy):
                 self.before_backward(**kwargs)
                 self.loss.backward()
                 self.after_backward(**kwargs)
+                # Gradient norm clipping
+                if self.max_grad_norm is not None:
+                    torch.nn.utils.clip_grad_norm_(
+                        self.model.parameters(),
+                        self.max_grad_norm)
 
                 # Optimization step
                 self.before_update(**kwargs)
@@ -416,7 +423,7 @@ class RLBaseStrategy(BaseStrategy):
 
         for ep_no in range(self.eval_episodes):
             obs = self.environment.reset()
-            for t in count():
+            for t in count(start=1):
                 # this may get stuck with games such as breakout and deterministic dqn
                 # if we let no op action be selected indefinitely 
                 action = self.model.get_action(

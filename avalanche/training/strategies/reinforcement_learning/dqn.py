@@ -39,25 +39,24 @@ class DQNStrategy(RLBaseStrategy):
             exploration_fraction: float = 0.1,
             double_dqn: bool = True,
             target_net_update_interval: Union[int, Timestep] = 10000,
-            max_grad_norm: float = None,
             polyak_update_tau: float = 1.,  # set to 1. to hard copy
-            discount_factor: float = 0.99,
             device='cpu',
             plugins: Optional[Sequence[StrategyPlugin]] = [],
             reset_replay_on_new_experience: bool = True,
-            initial_replay_memory:ReplayMemory=None,
-            eval_every: int = -1, eval_episodes: int = 1, evaluator=default_dqn_logger):
-        super().__init__(model, optimizer, per_experience_steps,
-                         criterion=criterion, rollouts_per_step=rollouts_per_step,
-                         max_steps_per_rollout=max_steps_per_rollout,
-                         updates_per_step=updates_per_step, device=device, plugins=plugins,
-                         discount_factor=discount_factor, eval_every=eval_every,
-                         eval_episodes=eval_episodes, evaluator=evaluator)
+            initial_replay_memory: ReplayMemory = None,
+            evaluator=default_dqn_logger, **kwargs):
+        super().__init__(
+            model, optimizer, per_experience_steps, criterion=criterion,
+            rollouts_per_step=rollouts_per_step,
+            max_steps_per_rollout=max_steps_per_rollout,
+            updates_per_step=updates_per_step, device=device, plugins=plugins,
+            evaluator=evaluator, **kwargs)
         if type(target_net_update_interval) is int:
             target_net_update_interval: Timestep = Timestep(
                 target_net_update_interval)
         for exp_step in self.per_experience_steps:
             assert target_net_update_interval.unit == exp_step.unit, "You must express the target network interval using the same unit as the training lenght"
+        assert initial_epsilon >= final_epsilon, "Initial epsilon value must be greater or equal than final one"
 
         self.replay_memory: ReplayMemory = initial_replay_memory
         self.replay_init_size = replay_memory_init_size
@@ -68,8 +67,6 @@ class DQNStrategy(RLBaseStrategy):
         self.target_net_update_interval: Timestep = target_net_update_interval
         self.polyak_update_tau = polyak_update_tau
         self.reset_replay = reset_replay_on_new_experience
-        self.max_grad_norm = max_grad_norm
-        assert initial_epsilon >= final_epsilon, "Initial epsilon value must be greater or equal than final one"
 
         self._init_eps = initial_epsilon
         self.eps = initial_epsilon
@@ -116,7 +113,7 @@ class DQNStrategy(RLBaseStrategy):
         if self.replay_memory is None:
             self.replay_memory = ReplayMemory(
                 size=self.replay_size, n_envs=self.n_envs)
-        elif self.training_exp_counter>0 and self.reset_replay:
+        elif self.training_exp_counter > 0 and self.reset_replay:
             self.replay_memory.reset()
 
         self.replay_memory.add_rollouts(rollouts)
@@ -207,10 +204,3 @@ class DQNStrategy(RLBaseStrategy):
             (1 - batch.dones.int()) * next_q_values.unsqueeze(-1)
 
         self.loss = self._criterion(q_pred, q_target)
-
-    def after_backward(self, **kwargs):
-        # Gradient norm clipping
-        if self.max_grad_norm is not None:
-            torch.nn.utils.clip_grad_norm_(
-                self.model.parameters(), self.max_grad_norm)
-        return super().after_backward(**kwargs)
