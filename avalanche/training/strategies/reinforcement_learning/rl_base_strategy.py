@@ -420,7 +420,7 @@ class RLBaseStrategy(BaseStrategy):
             0. for _ in range(self.eval_episodes)]}
         # single env only here
         self.eval_ep_lengths = {0: []}
-
+        # TODO: evaluate on self.eval_episodes parallel environments at once (evaluate_exp_parallel function)
         for ep_no in range(self.eval_episodes):
             obs = self.environment.reset()
             for t in count(start=1):

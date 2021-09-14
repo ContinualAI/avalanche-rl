@@ -1,3 +1,4 @@
+from os import replace
 import torch
 from typing import Union, List
 from dataclasses import dataclass, field
@@ -204,23 +205,71 @@ class ReplayMemory:
     """ Max number of Steps contained inside memory. When trying to add a new Step and size is reached, a previous Step is replaced. """
     size: int
     n_envs: int
-    _memory: List[Step] = field(default_factory=lambda: [])
 
     def __post_init__(self):
-        self.steps_counter: int = len(self._memory)
+        self.buffer_counter: int = 0
+        self.actual_size: int = 0
+        self._initialized: bool = False
+        self.observations = None 
+        self.actions = None
+        self.rewards = None
+        self.dones = None
+        self.next_observations = None
+        self._attrs = ['observations', 'actions',
+                       'rewards', 'dones', 'next_observations']
 
-    def _unravel_step(self, step: Step):
-        """
-            Slice through provided step on `n_envs` dimension returning `n_envs`
-            separated Steps. 
-        """
-        # support even envs not using VectorizedEnv interface
-        if self.n_envs < 0:
-            yield step
+    def _init_buffers(self, rollout: Rollout):
+        """Initialize buffers using first rollout info"""
+        assert rollout._flatten_time, "ReplayMemory expects tensors of shape `(n_envs*t) x D`, `flatten_time` flag must be set in rollout!"
+        # TODO: add support
+        assert len(
+            rollout)*rollout.n_envs <= self.size, "Rollouts with size greater than memory are not suppored!"
+        for attr in self._attrs:
+            # expect tensor of shape `(n_envs*t) x D`; also maintain dtype
+            rtensor = getattr(rollout, attr)
+            tensor = torch.zeros(
+                (self.size, *rtensor.shape[1:]),
+                dtype=rtensor.dtype)
+            setattr(self, attr, tensor)
+
+        self._initialized = True
+
+    # def _unravel_step(self, step: Step):
+    #     """
+    #         Slice through provided step on `n_envs` dimension returning `n_envs`
+    #         separated Steps. 
+    #     """
+    #     # support even envs not using VectorizedEnv interface
+    #     if self.n_envs < 0:
+    #         yield step
+    #     else:
+    #         for actor_no in range(step.n_envs):
+    #             # avoid adding n_env dimension
+    #             yield Step(*step[actor_no], _post_init=False)
+
+    def _add_rollout(self, rollout: Rollout):
+        """Implements "push to memory" operation simulating a circular buffer with `torch.roll`."""
+        # n_steps = rollout.observations.shape[0]
+        n_steps = len(rollout) * rollout.n_envs
+        free_space = self.size-self.buffer_counter
+        self.actual_size = min(self.actual_size+n_steps, self.size)
+        if n_steps > free_space:
+            # circular buffer strategy, put remaining element at the start and replace old ones
+            # do this for each rollout 'component'
+            for attr in self._attrs:
+                # get reference to tensor object
+                tensor = getattr(self, attr)
+                tensor = torch.roll(tensor, free_space, 0)
+                tensor[:n_steps] = getattr(rollout, attr)
+            self.buffer_counter = n_steps
         else:
-            for actor_no in range(step.n_envs):
-                # avoid adding n_env dimension
-                yield Step(*step[actor_no], _post_init=False)
+            # do this for each rollout 'component'
+            for attr in self._attrs:
+                # get reference to tensor object
+                tensor = getattr(self, attr)
+                tensor[self.buffer_counter:self.buffer_counter +
+                       n_steps] = getattr(rollout, attr)
+            self.buffer_counter += n_steps
 
     def add_rollouts(self, rollouts: List[Rollout]):
         """
@@ -232,16 +281,11 @@ class ReplayMemory:
             rollouts (List[Rollout]): [description]
         """
         # increase sample counter counting data from different actors as separate samples
-        # FIXME: should be more efficient
+        if not self._initialized:
+            self._init_buffers(rollouts[0])
+
         for rollout in rollouts:
-            for step in rollout.steps:
-                for actor_step in self._unravel_step(step):
-                    if self.steps_counter < self.size:
-                        self._memory.append(actor_step)
-                    else:
-                        self._memory[self.steps_counter %
-                                     self.size] = actor_step
-                    self.steps_counter += 1
+            self._add_rollout(rollout)
 
     def sample_batch(self, batch_dim: int, device: torch.device) -> Rollout:
         """
@@ -256,15 +300,21 @@ class ReplayMemory:
         Returns:
             [type]: [description]
         """
-        if batch_dim > len(self._memory):
+        if batch_dim > len(self):
             raise ValueError("Sample dimension exceeds current memory size")
-        # faster than alternatives
-        return Rollout([self._memory[i] for i in np.random.choice(len(self), size=batch_dim, replace=False)], n_envs=-1).to(device)
-        # return Rollout(np.random.choice(self._memory, size=batch_dim, replace=False).tolist(), n_envs=-1).to(device)
+        idxs = np.random.randint(0, len(self), size=batch_dim)
+        # create a syntethic rollout with batch data
+        batch = Rollout([0], n_envs=1, _unraveled=True, _shuffle=False)
+        for attr in ['states', 'actions', 'rewards', 'dones', 'next_states']:
+            # select sampled batch indices
+            tensor = getattr(
+                self, attr.replace('states', 'observations')
+                if 'states' in attr else attr)
+            setattr(batch, '_'+attr, tensor[idxs])
+        return batch.to(device)
 
     def reset(self):
-        self._memory = []
-        self.steps_counter = 0
+        self.__post_init__()
 
     def __len__(self):
-        return len(self._memory)
+        return self.actual_size
