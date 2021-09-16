@@ -310,8 +310,9 @@ class ReplayMemory:
             tensor = getattr(
                 self, attr.replace('states', 'observations')
                 if 'states' in attr else attr)
-            setattr(batch, '_'+attr, tensor[idxs])
-        return batch.to(device)
+            setattr(batch, '_'+attr, tensor[idxs].to(device))
+            
+        return batch
 
     def reset(self):
         self.__post_init__()

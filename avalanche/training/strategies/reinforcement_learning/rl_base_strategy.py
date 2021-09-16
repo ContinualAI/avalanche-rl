@@ -327,6 +327,7 @@ class RLBaseStrategy(BaseStrategy):
                 self.before_backward(**kwargs)
                 self.loss.backward()
                 self.after_backward(**kwargs)
+                
                 # Gradient norm clipping
                 if self.max_grad_norm is not None:
                     torch.nn.utils.clip_grad_norm_(

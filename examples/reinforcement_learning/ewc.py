@@ -18,6 +18,7 @@ from avalanche.logging import TextLogger
 from avalanche.models.dqn import EWCConvDeepQN
 from avalanche.training.plugins.strategy_plugin import StrategyPlugin
 from avalanche.training.strategies.reinforcement_learning.rl_base_strategy import Timestep
+from avalanche.evaluation.metrics.reward import GenericFloatMetric
 import json
 
 if __name__ == "__main__":
@@ -42,16 +43,21 @@ if __name__ == "__main__":
 
     # let's instatiate an external replay memory
     memory_size = 10000
-    memory = ReplayMemory(size=10000, n_envs=n_envs)
+    memory = ReplayMemory(size=memory_size, n_envs=n_envs)
     ewc_plugin = EWCRL(400., memory, mode='separate',
-                       start_ewc_after_steps=int(3e5))
+                       start_ewc_after_experience=2)
 
     # log to file
     file_logger = TextLogger(open('ewc_log.txt', 'w'))
 
+    # keep track of the loss
+    ewc_penalty_metric = GenericFloatMetric(
+        'loss', 'Ewc Loss', reset_value=0., emit_on=['after_backward'],
+        update_on=['before_backward'])
+
     evaluator = EvaluationPlugin(
-        *default_dqn_logger.metrics, loggers=default_dqn_logger.loggers +
-        [file_logger])
+        *default_dqn_logger.metrics, ewc_penalty_metric,
+        loggers=default_dqn_logger.loggers + [file_logger])
 
     # here we'll have task-specific biases & gains per layer (2 since we're learning 2 games)
     model = EWCConvDeepQN(4, (84, 84), action_space, n_tasks=2, bias=True)
