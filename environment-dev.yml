@@ -33,3 +33,4 @@ dependencies:
     - gdown
     - gym
     - ray
+    - opencv-python
