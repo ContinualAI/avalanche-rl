@@ -27,8 +27,8 @@ class DQNStrategy(RLBaseStrategy):
     def __init__(
             self, model: DQNModel, optimizer: Optimizer,
             per_experience_steps: Union[int, Timestep, List[Timestep]], 
-            rollouts_per_step: int = 8,  # how often do you perform an update step
-            max_steps_per_rollout: int = -1,
+            rollouts_per_step: int = -1,  # how often do you perform an update step
+            max_steps_per_rollout: int = 8,
             replay_memory_size: int = 10000,
             replay_memory_init_size: int = 5000,
             updates_per_step=1,
