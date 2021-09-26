@@ -206,6 +206,7 @@ if importlib.util.find_spec('continual_habitat_lab') is not None and importlib.u
     def _compute_experiences_length(
             task_change_steps: int, scene_change_steps: int, n_exps: int,
             unit: TimestepUnit) -> List[Timestep]:
+        # FIXME:
         # change experience every time either task or scene changes (might happen at non-uniform timesteps) 
         change1 = min(task_change_steps, scene_change_steps)
         change2 = max(task_change_steps, scene_change_steps) - change1
@@ -230,8 +231,12 @@ if importlib.util.find_spec('continual_habitat_lab') is not None and importlib.u
         steps_per_experience = Timestep(max_steps_per_experience)
         task_len_in_episodes = cl_habitat_lab_config.task_iterator.get(
             'max_task_repeat_episodes', -1)
+        if task_len_in_episodes is None:
+            task_len_in_episodes = -1
         task_len_in_steps = cl_habitat_lab_config.task_iterator.get(
             'max_task_repeat_steps', -1)
+        if task_len_in_steps is None:
+            task_len_in_steps = -1
 
         if task_len_in_episodes > 0:
             steps_per_experience = Timestep(
