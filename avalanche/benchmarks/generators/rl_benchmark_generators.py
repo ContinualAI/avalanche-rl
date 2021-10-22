@@ -4,6 +4,7 @@ from avalanche.benchmarks.rl_benchmark import RLScenario
 import gym
 from gym import envs
 from typing import *
+from gym.wrappers.time_limit import TimeLimit
 import numpy as np
 import importlib.util
 from gym.wrappers.atari_preprocessing import AtariPreprocessing
@@ -205,6 +206,7 @@ if importlib.util.find_spec('continual_habitat_lab') is not None and importlib.u
     def _compute_experiences_length(
             task_change_steps: int, scene_change_steps: int, n_exps: int,
             unit: TimestepUnit) -> List[Timestep]:
+        # FIXME:
         # change experience every time either task or scene changes (might happen at non-uniform timesteps) 
         change1 = min(task_change_steps, scene_change_steps)
         change2 = max(task_change_steps, scene_change_steps) - change1
@@ -218,7 +220,8 @@ if importlib.util.find_spec('continual_habitat_lab') is not None and importlib.u
             # eval_config: ContinualHabitatLabConfig = None, 
             max_steps_per_experience: int = 1000,
             change_experience_on_scene_change: bool = False,
-            time_limit_tasks: Union[int, List[int]] = None,
+            max_steps_per_episode: int = None,
+            wrapper_classes: List[Wrapper]=list(),
             *args, **kwargs) -> Tuple[RLScenario, List[Timestep]]:
 
         # number of experiences as the number of tasks defined in configuration
@@ -228,8 +231,12 @@ if importlib.util.find_spec('continual_habitat_lab') is not None and importlib.u
         steps_per_experience = Timestep(max_steps_per_experience)
         task_len_in_episodes = cl_habitat_lab_config.task_iterator.get(
             'max_task_repeat_episodes', -1)
+        if task_len_in_episodes is None:
+            task_len_in_episodes = -1
         task_len_in_steps = cl_habitat_lab_config.task_iterator.get(
             'max_task_repeat_steps', -1)
+        if task_len_in_steps is None:
+            task_len_in_steps = -1
 
         if task_len_in_episodes > 0:
             steps_per_experience = Timestep(
@@ -261,7 +268,11 @@ if importlib.util.find_spec('continual_habitat_lab') is not None and importlib.u
 
         # instatiate RLScenario from a given lab configuration
         env = ContinualHabitatEnv(cl_habitat_lab_config)
-        # TODO: add plugin wrappers
+        # add plugin wrappers
+        for wrapper in wrapper_classes:
+            env = wrapper(env)
+        if max_steps_per_episode is not None:
+            env = TimeLimit(env, max_steps_per_episode)
 
         # TODO: evaluating on same env changes its state, must have some evaluation mode
         # if eval_config is None:
@@ -269,7 +280,6 @@ if importlib.util.find_spec('continual_habitat_lab') is not None and importlib.u
 
         # also return computed number of steps per experience
         # NOTE: parallel_env only supported on distributed settings due to opengl lock
-        # TODO: test with multiple gpus?
         return RLScenario(
             envs=[env],
             n_experiences=n_exps, n_parallel_envs=1, eval_envs=[env],

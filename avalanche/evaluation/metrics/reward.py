@@ -76,6 +76,8 @@ def moving_window_stat(
     return metrics
 
 # TODO: immediate reward metric
+
+
 class ReturnPluginMetric(MovingWindowedStat):
     """
         Keep track of sum of rewards (returns) per episode.
@@ -93,7 +95,7 @@ class ReturnPluginMetric(MovingWindowedStat):
         new_returns = self._moving_window.window_size
         if self._mode == 'train':
             new_returns = len(rewards['past_returns'])-self._last_returns_len
-            if new_returns==0:
+            if new_returns == 0:
                 # no episode finished since last update
                 return
             new_returns = min(new_returns, self._moving_window.window_size)
@@ -139,10 +141,12 @@ class EpLenghtPluginMetric(MovingWindowedStat):
         # iterate over parallel envs episodes (actor_id->ep_lengths)
         for actor_id, actor_ep_lengths in lengths.items():
             if self._mode == 'train':
-                new_ep_lengths = len(actor_ep_lengths)-self._actor_ep_lengths[actor_id]
-                if new_ep_lengths==0:
+                new_ep_lengths = len(
+                    actor_ep_lengths)-self._actor_ep_lengths[actor_id]
+                if new_ep_lengths == 0:
                     continue
-                new_ep_lengths = min(new_ep_lengths, self._moving_window.window_size)
+                new_ep_lengths = min(
+                    new_ep_lengths, self._moving_window.window_size)
                 self._actor_ep_lengths[actor_id] = len(actor_ep_lengths)
 
             for ep_len in actor_ep_lengths[-new_ep_lengths:]: 
@@ -177,7 +181,7 @@ class GenericFloatMetric(PluginMetric[float]):
 
     def __init__(self, metric_variable_name: str, name: str,
                  reset_value: float = None, emit_on=['after_rollout'],
-                 update_on=['after_rollout']):
+                 update_on=['after_rollout'], reset_on=[]):
         super().__init__()
         self.metric_name = metric_variable_name
         self.name = name
@@ -186,15 +190,17 @@ class GenericFloatMetric(PluginMetric[float]):
         self.x_coord = 0
         self.metric_value = None
 
-        # define callbacks
-        for update_call in update_on:
-            setattr(self, update_call, lambda strat: self._update(strat))
+        for update_callback in update_on:
+            setattr(self, update_callback, self._update)
         for emit_call in emit_on:
-            foo = getattr(self, emit_call)
-            setattr(self, update_call, lambda strat: [
-                    f(strat) for f in [foo, lambda s: self._emit(s)]][-1])
+            # append calls defining a pipeline of callbacks
+            current_foo = getattr(self, emit_call)
+            setattr(self, emit_call, lambda strat: [
+                    f(strat) for f in [current_foo, self._emit]][-1])
+        for reset_callback in reset_on:
+            setattr(self, reset_callback, self.reset)
 
-    def reset(self) -> None:
+    def reset(self, strategy) -> None:
         """
         Reset the metric
         """
@@ -207,7 +213,14 @@ class GenericFloatMetric(PluginMetric[float]):
         return self.metric_value
 
     def _update(self, strategy):
+        import torch
+        import numpy as np
         self.metric_value = getattr(strategy, self.metric_name)
+        # add support for single item arrays/tensors (e.g. loss)
+        if isinstance(
+                self.metric_value, torch.Tensor) or isinstance(
+                self.metric_value, np.ndarray):
+            self.metric_value = self.metric_value.item() 
         if self.init_val is None:
             self.init_val = self.metric_value
 

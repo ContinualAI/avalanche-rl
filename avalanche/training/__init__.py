@@ -19,7 +19,7 @@ default_logger = EvaluationPlugin(
 
 default_rl_logger = EvaluationPlugin(
                                      moving_window_stat('reward', window_size=10, stats=['mean', 'max', 'std']),
-                                     moving_window_stat('reward', window_size=4, stats=['mean'], mode='eval'),
+                                     moving_window_stat('reward', window_size=4, stats=['mean', 'std'], mode='eval'),
                                      moving_window_stat('ep_length', window_size=10, stats=['mean', 'max', 'std']),
-                                     moving_window_stat('ep_length', window_size=4, stats=['mean'], mode='eval'),
+                                     moving_window_stat('ep_length', window_size=4, stats=['mean', 'std'], mode='eval'),
                                      loggers=[TqdmWriteInteractiveLogger(log_every=10)])

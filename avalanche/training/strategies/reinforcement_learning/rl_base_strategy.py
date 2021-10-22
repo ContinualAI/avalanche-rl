@@ -327,6 +327,7 @@ class RLBaseStrategy(BaseStrategy):
                 self.before_backward(**kwargs)
                 self.loss.backward()
                 self.after_backward(**kwargs)
+                
                 # Gradient norm clipping
                 if self.max_grad_norm is not None:
                     torch.nn.utils.clip_grad_norm_(
@@ -420,7 +421,7 @@ class RLBaseStrategy(BaseStrategy):
             0. for _ in range(self.eval_episodes)]}
         # single env only here
         self.eval_ep_lengths = {0: []}
-
+        # TODO: evaluate on self.eval_episodes parallel environments at once (evaluate_exp_parallel function)
         for ep_no in range(self.eval_episodes):
             obs = self.environment.reset()
             for t in count(start=1):
