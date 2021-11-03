@@ -1,6 +1,6 @@
 from collections import defaultdict
 from gym.core import Wrapper
-from avalanche.benchmarks.rl_benchmark import RLScenario
+from avalanche_rl.benchmarks.rl_benchmark import RLScenario
 import gym
 from gym import envs
 from typing import *
@@ -8,7 +8,7 @@ from gym.wrappers.time_limit import TimeLimit
 import numpy as np
 import importlib.util
 from gym.wrappers.atari_preprocessing import AtariPreprocessing
-from avalanche.training.strategies.reinforcement_learning.env_wrappers import ClipRewardWrapper, FireResetWrapper, FrameStackingWrapper
+from avalanche_rl.training.strategies.reinforcement_learning.env_wrappers import ClipRewardWrapper, FireResetWrapper, FrameStackingWrapper
 import random
 
 
