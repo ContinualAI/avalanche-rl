@@ -8,7 +8,7 @@ from gym.wrappers.time_limit import TimeLimit
 import numpy as np
 import importlib.util
 from gym.wrappers.atari_preprocessing import AtariPreprocessing
-from avalanche_rl.training.strategies.reinforcement_learning.env_wrappers import ClipRewardWrapper, FireResetWrapper, FrameStackingWrapper
+from avalanche_rl.training.strategies.env_wrappers import ClipRewardWrapper, FireResetWrapper, FrameStackingWrapper
 import random
 
 
@@ -201,7 +201,7 @@ def atari_benchmark_generator(
 if importlib.util.find_spec('continual_habitat_lab') is not None and importlib.util.find_spec('habitat_sim') is not None:
     from continual_habitat_lab import ContinualHabitatLabConfig, ContinualHabitatEnv
     from continual_habitat_lab.scene_manager import SceneManager
-    from avalanche.training.strategies.reinforcement_learning.rl_base_strategy import TimestepUnit, Timestep
+    from avalanche_rl.training.strategies.reinforcement_learning.rl_base_strategy import TimestepUnit, Timestep
 
     def _compute_experiences_length(
             task_change_steps: int, scene_change_steps: int, n_exps: int,

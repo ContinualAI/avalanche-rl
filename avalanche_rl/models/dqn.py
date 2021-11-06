@@ -1,7 +1,7 @@
 import torch.nn as nn
 import torch
 import torch.nn.functional as F
-from .simple_mlp import SimpleMLP
+from avalanche.models.simple_mlp import SimpleMLP
 
 
 class DQNModel(nn.Module):
@@ -27,10 +27,10 @@ class MLPDeepQN(DQNModel):
             self, input_size: int, hidden_size: int, n_actions: int,
             hidden_layers: int = 1):
         super().__init__()
-        # it does use dropout
+        # disable dropout by default
         self.dqn = SimpleMLP(
             num_classes=n_actions, input_size=input_size,
-            hidden_size=hidden_size, hidden_layers=hidden_layers, dropout=False)
+            hidden_size=hidden_size, hidden_layers=hidden_layers, drop_rate=0.)
     
     def forward(self, x: torch.Tensor, task_label=None):
         return self.dqn(x)

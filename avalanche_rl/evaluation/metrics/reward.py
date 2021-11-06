@@ -1,12 +1,14 @@
 from collections import defaultdict
-from avalanche.evaluation.metric_definitions import GenericPluginMetric, PluginMetric, MetricValue
+from avalanche_rl.evaluation.metric_definitions import RLPluginMetric
+from avalanche.evaluation.metric_definitions import MetricValue, GenericPluginMetric
 from avalanche.evaluation.metric_results import MetricResult
-from avalanche.evaluation.metrics.mean import WindowedMovingAverage, Mean
+from avalanche_rl.evaluation.metrics.mean import WindowedMovingAverage
+from avalanche.training.strategies.base_strategy import BaseStrategy
 from typing import Dict, Union, List
 import numpy as np
 
 
-class MovingWindowedStat(PluginMetric[float]):
+class MovingWindowedStat(RLPluginMetric[float]):
     def __init__(self, window_size: int, stat: str = 'mean',
                  name: str = 'Moving Windowed Stat', mode='train'):
         assert mode in ['train', 'eval']
@@ -60,7 +62,7 @@ class MovingWindowedStat(PluginMetric[float]):
 
 def moving_window_stat(
         metric: str, window_size: int = 10, stats=['mean'],
-        mode='train') -> List[PluginMetric]:
+        mode='train') -> List[RLPluginMetric]:
     metric = metric.lower()
     assert metric in ['reward', 'ep_length']
     if mode == 'any':
@@ -176,7 +178,7 @@ class EpLenghtPluginMetric(MovingWindowedStat):
             return self.emit()
 
 
-class GenericFloatMetric(PluginMetric[float]):
+class GenericFloatMetric(RLPluginMetric[float]):
     # Logs output of a simple float value without too many bells and whistles 
 
     def __init__(self, metric_variable_name: str, name: str,

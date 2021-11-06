@@ -1,6 +1,6 @@
 import argparse
 import gym
-from avalanche.envs import *
+from avalanche_rl.envs import *
 import cv2 
 from argparse import ArgumentParser
 import argparse

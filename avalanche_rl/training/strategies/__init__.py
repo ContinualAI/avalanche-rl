@@ -1,11 +1,4 @@
-"""
-Strategies define the basic train/eval loops. A strategy can be used as is or
-customized by adding plugins, which may be used to combine multiple basic
-strategies (e.g., EWC + replay).
-"""
-from .base_strategy import *
-from .joint_training import *
-from .ar1 import AR1
-from .cumulative import Cumulative
-from .strategy_wrappers import *
-from .deep_slda import *
+from .vectorized_env import VectorizedEnvironment
+from .rl_base_strategy import RLBaseStrategy
+from .dqn import DQNStrategy
+from .actor_critic import A2CStrategy
