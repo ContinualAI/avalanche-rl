@@ -1,7 +1,10 @@
-from avalanche.training.strategies.reinforcement_learning.rl_base_strategy import Timestep, TimestepUnit
+from avalanche_rl.training.strategies.rl_base_strategy import TimestepUnit
 import pytest
-from avalanche.benchmarks.generators.rl_benchmark_generators import habitat_benchmark_generator
-from continual_habitat_lab import ContinualHabitatLabConfig, ContinualHabitatEnv
+try:
+    from continual_habitat_lab import ContinualHabitatLabConfig, ContinualHabitatEnv
+except ImportError:
+    pytest.skip("Need Continual Habitat Lab to run these tests!", allow_module_level=True)
+from avalanche_rl.benchmarks.generators.rl_benchmark_generators import habitat_benchmark_generator
 from omegaconf import OmegaConf
 
 def make_cfg(max_steps = 100, res=(128, 128), task_iterator_max_eps=None):

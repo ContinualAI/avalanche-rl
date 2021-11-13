@@ -1,5 +1,5 @@
 
-from avalanche.benchmarks.generators.rl_benchmark_generators import atari_benchmark_generator, gym_benchmark_generator
+from avalanche_rl.benchmarks.generators.rl_benchmark_generators import atari_benchmark_generator, gym_benchmark_generator
 import pytest
 
 

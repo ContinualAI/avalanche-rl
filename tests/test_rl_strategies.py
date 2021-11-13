@@ -1,15 +1,14 @@
 import pytest
-from avalanche.training.strategies.reinforcement_learning import *
+from avalanche_rl.training.strategies import *
 import torch
 from avalanche.models.simple_mlp import SimpleMLP
 from torch.optim import Adam
 import torch.nn as nn
 import numpy as np
-from avalanche.benchmarks.generators.rl_benchmark_generators import gym_benchmark_generator
+from avalanche_rl.benchmarks.generators.rl_benchmark_generators import gym_benchmark_generator
 
 
 # for testing purposes implement all methods needed to have a working RL Strategy
-# TODO: add to available strategies!
 class RandomTestStrategy(RLBaseStrategy):
 
     def __init__(
@@ -54,8 +53,13 @@ def make_random_strategy(
         max_steps_per_rollout=max_steps_per_rollout,
         updates_per_step=updates_per_step, plugins=plugins)
 
-@pytest.mark.parametrize('rollouts_per_step, max_steps_per_rollout', [(2, -1), (-1, 10), (10, 10)])
-def test_rollouts_single_env(rollouts_per_step: int, max_steps_per_rollout: int):
+
+@pytest.mark.parametrize('rollouts_per_step, max_steps_per_rollout',
+                         [(2, -1),
+                          (-1, 10),
+                          (10, 10)])
+def test_rollouts_single_env(
+        rollouts_per_step: int, max_steps_per_rollout: int):
     # make strategy
     test_strategy = make_random_strategy(
         1, rollouts_per_step, max_steps_per_rollout)

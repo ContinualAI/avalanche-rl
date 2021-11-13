@@ -11,10 +11,10 @@ import copy
 import random
 from avalanche_rl.training import default_rl_logger
 from avalanche_rl.evaluation.metrics.reward import GenericFloatMetric
-from avalanche.training.plugins.evaluation import EvaluationPlugin
+from avalanche_rl.training.plugins.evaluation import RLEvaluationPlugin
 from avalanche_rl.models.dqn import DQNModel
 
-default_dqn_logger = EvaluationPlugin(
+default_dqn_logger = RLEvaluationPlugin(
     *default_rl_logger.metrics,
     GenericFloatMetric(
         'eps', 'Exploration Eps', update_on=['after_rollout'],

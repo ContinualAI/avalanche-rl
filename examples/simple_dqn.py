@@ -5,7 +5,7 @@ from avalanche_rl.benchmarks.generators.rl_benchmark_generators import gym_bench
 import torch
 
 if __name__ == "__main__":
-    device = torch.device('cuda:0')
+    device = torch.device('cuda:0') if torch.cuda.is_available() else 'cpu'
 
     scenario = gym_benchmark_generator(
         ['CartPole-v1'],

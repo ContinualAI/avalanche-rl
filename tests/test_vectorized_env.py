@@ -1,10 +1,10 @@
 from gym.wrappers.atari_preprocessing import AtariPreprocessing
 import pytest
 import gym
-from avalanche.training.strategies.reinforcement_learning.vectorized_env import VectorizedEnvironment
+from avalanche_rl.training.strategies.vectorized_env import VectorizedEnvironment
 import numpy as np
 import ray
-from avalanche.training.strategies.reinforcement_learning.env_wrappers import Array2Tensor, FrameStackingWrapper, RGB2GrayWrapper, CropObservationWrapper
+from avalanche_rl.training.strategies.env_wrappers import Array2Tensor, FrameStackingWrapper, RGB2GrayWrapper, CropObservationWrapper
 import torch
 from gym import Env
 import gym.spaces

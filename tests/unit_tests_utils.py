@@ -72,17 +72,7 @@ def load_experience_train_eval(experience, batch_size=32, num_workers=0):
         break
 
 
-def get_device():
-    if "USE_GPU" in os.environ:
-        use_gpu = os.environ['USE_GPU'].lower() in ["true"]
-    else:
-        use_gpu = False
-    print("Test on GPU:", use_gpu)
-    if use_gpu:
-        device = "cuda"
-    else:
-        device = "cpu"
-    return device
+
 
 
 __all__ = [
