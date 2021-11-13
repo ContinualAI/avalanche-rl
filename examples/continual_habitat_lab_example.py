@@ -38,21 +38,22 @@ class HabitatObservations(ObservationWrapper):
 
 
 class HabitatPlugin(StrategyPlugin):
-    def __init__(self, max_steps: int=None):
+    def __init__(self, max_steps: int = None):
         super().__init__()
         self.max_steps = max_steps
 
     def before_make_env(self, strategy: RLBaseStrategy, **kwargs):
         strategy.environment = HabitatObservations(strategy.environment)
         # put some time limit here
-        strategy.environment = TimeLimit(strategy.environment, max_episode_steps=self.max_steps)
+        strategy.environment = TimeLimit(
+            strategy.environment, max_episode_steps=self.max_steps)
         super().before_make_env(strategy)
+
 
 image_resolution = (128, 128)
 # pass max steps to get sensible episode termination (also needed to display stats)
 max_steps_per_ep = 100
 if __name__ == "__main__":
-    
 
     config = {'tasks': [{'type': 'ObjectNav', 'name': 'Task0'}], 
               'scene': {
@@ -65,13 +66,14 @@ if __name__ == "__main__":
             }]
         }, 
         # 'task_iterator': {
-            # 'max_steps'
+        # 'max_steps'
         # }
     }
 
     cfg = ContinualHabitatLabConfig(OmegaConf.create(config), from_cli=False)
 
-    scenario, steps_per_exps = habitat_benchmark_generator(cfg, max_steps_per_experience=100000)
+    scenario, steps_per_exps = habitat_benchmark_generator(
+        cfg, max_steps_per_experience=100000)
 
     # default actions: turn right-turn left-move forward
     # FIXME: try with normal network not from atari

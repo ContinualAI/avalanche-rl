@@ -1,13 +1,15 @@
 from gym.wrappers.atari_preprocessing import AtariPreprocessing
 import pytest
 import gym
-from avalanche.training.strategies.reinforcement_learning.vectorized_env import VectorizedEnvironment
+from avalanche_rl.training.strategies.vectorized_env import VectorizedEnvironment
 import numpy as np
 import ray
-from avalanche.training.strategies.reinforcement_learning.env_wrappers import Array2Tensor, FrameStackingWrapper, RGB2GrayWrapper, CropObservationWrapper
+from avalanche_rl.training.strategies.env_wrappers import Array2Tensor, FrameStackingWrapper, RGB2GrayWrapper, CropObservationWrapper
 import torch
 from gym import Env
 import gym.spaces
+from avalanche_rl.training.strategies.buffers import Step, Rollout
+
 
 class CustomTestEnv(Env):
 
@@ -118,7 +120,8 @@ def test_env_wrapping():
     env = CropObservationWrapper(env, resize_shape=(84, 84))
 
     # wrap each actor environment to reduce array shape before gathering results 
-    venv = VectorizedEnvironment(env, 2, auto_reset=False, wrappers_generators=[RGB2GrayWrapper,CropObservationWrapper])
+    venv = VectorizedEnvironment(env, 2, auto_reset=False, wrappers_generators=[
+                                 RGB2GrayWrapper, CropObservationWrapper])
     # can be wrapped like any env as long as extra `n_envs` dimension is taken into consideration 
     venv = Array2Tensor(venv)
 
@@ -178,28 +181,27 @@ def test_atari_wrapped():
         env.actors[1].reset.step(0)
     with pytest.raises(Exception):
         env.actors[2].reset.step(0)
-        
+
     # init observation is always the same
     obs = env.reset()
     assert obs.shape == (
         3, 4, 84, 84) and isinstance(obs, torch.Tensor)
 
     # first frame we don't move (?)
-    env.step(np.asarray([0,2,3]))
+    env.step(np.asarray([0, 2, 3]))
     for i in range(10):
         # pong actions ['NOOP', 'FIRE', 'RIGHT', 'LEFT', 'RIGHTFIRE', 'LEFTFIRE']
         actions = np.array([0, 2, 3], dtype=np.int32)
         obs, _, done, info = env.step(actions)
         # check observations are different
-        assert torch.sum(obs[0]-obs[1]).item() != 0 and torch.sum(obs[0]-obs[2]
-                                                           ).item() != 0 and torch.sum(obs[1]-obs[2]).item() != 0
+        assert torch.sum(obs[0] - obs[1]).item() != 0 and torch.sum(obs[0] -
+                                                                    obs[2]).item() != 0 and torch.sum(obs[1] - obs[2]).item() != 0
 
     env.close()
 
 
 @pytest.mark.parametrize('shuffle', [True, False])
 def test_custom_env_rollout(shuffle: bool):
-    from avalanche.training.strategies.reinforcement_learning.buffers import Step, Rollout
     n_steps = 10
     n_envs = 7
 
