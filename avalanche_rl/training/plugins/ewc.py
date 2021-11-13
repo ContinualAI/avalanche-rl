@@ -5,6 +5,7 @@ from avalanche.training.utils import copy_params_dict, zerolike_params_dict
 from avalanche_rl.training.strategies.buffers import ReplayMemory
 from avalanche_rl.training.strategies import RLBaseStrategy
 
+
 class EWCRL(EWCPlugin):
     """
     Elastic Weight Consolidation (EWC) plugin for Reinforcement Learning, as presented
@@ -16,7 +17,7 @@ class EWCRL(EWCPlugin):
 
     def __init__(
             self, ewc_lambda, replay_memory: 'ReplayMemory', mode='separate', fisher_update_steps: int = 10,
-            batch_size:int=32, start_ewc_after_steps: int = 0, start_ewc_after_experience: int = 1,
+            batch_size: int = 32, start_ewc_after_steps: int = 0, start_ewc_after_experience: int = 1,
             decay_factor=None, keep_importance_data=False):
         """
             :param ewc_lambda: hyperparameter to weigh the penalty inside the total
@@ -84,7 +85,8 @@ class EWCRL(EWCPlugin):
                 strategy.update(None)
             else:
                 # sample batch
-                batch = self.memory.sample_batch(self.batch_size, strategy.device)
+                batch = self.memory.sample_batch(
+                    self.batch_size, strategy.device)
                 strategy.update([batch])
 
             optimizer.zero_grad()

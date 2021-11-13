@@ -133,10 +133,11 @@ class VectorizedEnvironment(object):
         elif type(envs) is list:
             assert len(envs) == n_envs
             if hasattr(envs.spec, 'entry_point') and 'atari' in envs.spec.entry_point:
-                raise NotImplementedError('Passing a list of Atari envs is currently not supported')
+                raise NotImplementedError(
+                    'Passing a list of Atari envs is currently not supported')
             else:
                 self.env = deepcopy(envs[0])
-        
+
         self.action_space = self.env.action_space
         # re-define observation space
         self.observation_space = self.env.observation_space

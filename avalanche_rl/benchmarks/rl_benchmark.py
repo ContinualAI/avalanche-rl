@@ -29,7 +29,7 @@ class RLScenario(GenericCLScenario['RLExperience']):
                  n_experiences: int,
                  n_parallel_envs: Union[int, List[int]],
                  eval_envs: Union[List[Env], List[Callable[[], Env]]],
-                 wrappers_generators: Dict[str, List[Wrapper]]=None,
+                 wrappers_generators: Dict[str, List[Wrapper]] = None,
                  task_labels: bool = True,
                  shuffle: bool = False, 
                  seed: Optional[int] = None):

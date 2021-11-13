@@ -7,7 +7,8 @@ import argparse
 
 if __name__ == "__main__":
     args = ArgumentParser()
-    args.add_argument('-e', '--env', help='Environment id', default='CCartPole-v1')
+    args.add_argument('-e', '--env', help='Environment id',
+                      default='CCartPole-v1')
     # any other argument to pass to the env
     # args.add_argument('args', nargs=argparse.REMAINDER)
     args, extras = args.parse_known_args()

@@ -36,14 +36,14 @@ class ContinualCartPoleEnv(CartPoleEnv):
 class ContinualMountainCarEnv(MountainCarEnv):
 
     def __init__(self, 
-                goal_velocity=0., 
-                min_position=-1.2,
-                max_position=0.6,
-                max_speed=0.07,
-                goal_position=0.5,
-                force=0.001,
-                gravity=0.0025, 
-                seed=None):
+                 goal_velocity=0., 
+                 min_position=-1.2,
+                 max_position=0.6,
+                 max_speed=0.07,
+                 goal_position=0.5,
+                 force=0.001,
+                 gravity=0.0025, 
+                 seed=None):
         super().__init__(goal_velocity=goal_velocity)
         self.min_position = min_position
         self.max_position = max_position

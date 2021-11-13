@@ -26,5 +26,5 @@ class WindowedMovingAverage(Metric[float]):
     def reset(self):
         self.window = []
 
-__all__ = ["WindowedMovingAverage"]
 
+__all__ = ["WindowedMovingAverage"]

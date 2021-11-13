@@ -258,7 +258,7 @@ class BaseStrategy:
         self.make_optimizer()
 
         self.before_training_exp(**kwargs)
-        
+
         do_final = True
         if self.eval_every > 0 and \
                 (self.train_epochs - 1) % self.eval_every == 0:

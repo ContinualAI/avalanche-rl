@@ -1,6 +1,7 @@
 import os
 import torch
 
+
 def get_device():
     if "USE_GPU" in os.environ:
         use_gpu = os.environ['USE_GPU'].lower() in ["true"]

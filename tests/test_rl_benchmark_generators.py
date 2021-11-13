@@ -31,7 +31,8 @@ def test_task_label(n_exps):
 
 @pytest.mark.parametrize('n_exps', [1, 4, 16])
 def test_atari_task_label(n_exps):
-    envs = ['PongNoFrameskip-v4', 'BreakoutNoFrameskip-v4', 'FreewayNoFrameskip-v0']
+    envs = ['PongNoFrameskip-v4',
+            'BreakoutNoFrameskip-v4', 'FreewayNoFrameskip-v0']
     scenario = atari_benchmark_generator(
         envs, frame_stacking=True, normalize_observations=True,
         terminal_on_life_loss=True, n_experiences=n_exps, eval_envs=envs[: 2])

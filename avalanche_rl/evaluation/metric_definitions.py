@@ -18,5 +18,3 @@ class RLPluginMetric(PluginMetric[TResult]):
     def after_rollout(self, strategy: 'BaseStrategy') \
             -> 'MetricResult':
         pass
-
-

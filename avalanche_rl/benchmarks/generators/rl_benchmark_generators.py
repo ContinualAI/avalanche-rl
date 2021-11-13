@@ -47,7 +47,8 @@ def gym_benchmark_generator(
         n_parallel_envs: int = 1,
         eval_envs: Union[List[str], List[gym.Env]] = None,
         n_experiences=None,
-        env_wrappers: Union[Callable[[Any], Wrapper], List[Callable[[Any], Wrapper]], Dict[str, List[Callable[[Any], Wrapper]]]] = None,
+        env_wrappers: Union[Callable[[Any], Wrapper], List[Callable[[
+            Any], Wrapper]], Dict[str, List[Callable[[Any], Wrapper]]]] = None,
         envs_ids_to_sample_from: List[str] = None, *args, **kwargs) -> RLScenario:
     """
     Generates a RL benchmark with the provided options. You can build a benchmark by either
@@ -221,7 +222,7 @@ if importlib.util.find_spec('continual_habitat_lab') is not None and importlib.u
             max_steps_per_experience: int = 1000,
             change_experience_on_scene_change: bool = False,
             max_steps_per_episode: int = None,
-            wrapper_classes: List[Wrapper]=list(),
+            wrapper_classes: List[Wrapper] = list(),
             *args, **kwargs) -> Tuple[RLScenario, List[Timestep]]:
 
         # number of experiences as the number of tasks defined in configuration

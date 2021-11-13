@@ -31,10 +31,9 @@ class MLPDeepQN(DQNModel):
         self.dqn = SimpleMLP(
             num_classes=n_actions, input_size=input_size,
             hidden_size=hidden_size, hidden_layers=hidden_layers, drop_rate=0.)
-    
+
     def forward(self, x: torch.Tensor, task_label=None):
         return self.dqn(x)
-        
 
 
 class ConvDeepQN(DQNModel):
@@ -79,6 +78,7 @@ class EWCConvDeepQN(DQNModel):
     """Model used in the original EWC paper https://arxiv.org/abs/1612.00796.
         It is a variant of the original DQN with added task-specific biases and gains. 
     """
+
     def __init__(self, input_channels, image_shape, n_actions, n_tasks, bias=False):
         super().__init__()
 
@@ -91,8 +91,10 @@ class EWCConvDeepQN(DQNModel):
         # bias/gain are game-specific and are initialized as in the paper
         for layer in range(1, 4):
             for task in range(n_tasks):
-                setattr(self, f'bias{layer}_{task}', nn.parameter.Parameter(torch.zeros(*shapes[layer-1])))
-                setattr(self, f'gain{layer}_{task}', nn.parameter.Parameter(torch.ones(*shapes[layer-1])))
+                setattr(self, f'bias{layer}_{task}', nn.parameter.Parameter(
+                    torch.zeros(*shapes[layer-1])))
+                setattr(self, f'gain{layer}_{task}', nn.parameter.Parameter(
+                    torch.ones(*shapes[layer-1])))
 
         # fully connected part
         self.l1 = nn.Linear(shapes[-1], 1024, bias=bias)
@@ -102,9 +104,10 @@ class EWCConvDeepQN(DQNModel):
         fc_sizes = [1024, n_actions]
         for layer in range(1, 3):
             for task in range(n_tasks):
-                setattr(self, f'bias_l{layer}_{task}', nn.parameter.Parameter(torch.zeros(fc_sizes[layer-1],)))
-                setattr(self, f'gain_l{layer}_{task}', nn.parameter.Parameter(torch.ones(fc_sizes[layer-1])))
-
+                setattr(self, f'bias_l{layer}_{task}', nn.parameter.Parameter(
+                    torch.zeros(fc_sizes[layer-1],)))
+                setattr(self, f'gain_l{layer}_{task}', nn.parameter.Parameter(
+                    torch.ones(fc_sizes[layer-1])))
 
     def forward(self, x: torch.Tensor, task_label=None) -> torch.Tensor:
         # biases and gains are game-specific: select them using task label
