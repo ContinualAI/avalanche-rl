@@ -101,12 +101,16 @@ def test_rollout(type_: str, n_envs: int, flatten):
 
 def test_rollout_slicing():
     steps = [make_step('torch', 1) for _ in range(20)]
-    rollout = Rollout(steps, n_envs=1)
+    rollout = Rollout(steps, n_envs=1, _shuffle=False)
     # without unravel
     assert not rollout._unraveled and not rollout[0]._unraveled
     assert rollout[1].steps == steps[1]
     assert rollout[:10].steps == steps[:10]
     assert rollout[-10:].steps == steps[-10:]
+    # NOTE: this won't guarantee `rollout[:10].observations = rollout.observations[:10]`
+    # as `rollout` will get shuffled upon unravelling (that's why we set `_shuffle=False` above)
+    obs = rollout[:10].observations
+    assert (obs == rollout.observations[:10]).all()
     # with unravel
     actions = rollout.actions
     states = rollout.observations
@@ -141,12 +145,13 @@ def test_replay_memory():
     # add a rollout with size greater than memory
     # mem = ReplayMemory(50, n_envs)
     rollout = Rollout([make_step(type_, n_envs)
-                      for _ in range(100)], n_envs=n_envs, _flatten_time=True)
+                      for _ in range(100)], n_envs=n_envs, _flatten_time=True, _shuffle=False)
     mem.add_rollouts([rollout])
     assert mem.actual_size == 50
     for attr in ['observations', 'actions', 'rewards', 'dones',
                  'next_observations']:
         attr_tensor = getattr(mem, attr)
+        # NOTE: shuffle must be False to assert this
         assert (attr_tensor == getattr(rollout, attr)[-mem.size:]).all()
 
 

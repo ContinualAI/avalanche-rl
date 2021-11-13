@@ -25,7 +25,7 @@ class RandomTestStrategy(RLBaseStrategy):
         return np.asarray([self.environment.action_space.sample()
                            for i in range(self.n_envs)])
 
-    def update(self, rollouts, n_update_steps: int):
+    def update(self, rollouts):
         # simulate loss implementation
         x, y = torch.randn(1, 3, requires_grad=True), torch.randn(1, 3)
         self.loss = torch.sum((x - y)**2) 

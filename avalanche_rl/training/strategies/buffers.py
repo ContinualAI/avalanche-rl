@@ -124,7 +124,7 @@ class Rollout:
                     # `n_env` x `len(steps)` x D
                     attr_tensor = torch.transpose(attr_tensor, 1, 0)
 
-                if self._shuffle:    
+                if self._shuffle:
                     attr_tensor = attr_tensor[perm]
 
                 setattr(self, '_'+attr, attr_tensor)
@@ -197,6 +197,9 @@ class Rollout:
         return len(self.steps)
 
     def __getitem__(self, idx):
+        # NOTE: this won't guarantee `rollout[:10].observations = self.observations[:10]`
+        # if shuffle is set and unravelling hasn't been done yet, as the current rollout
+        # will get shuffled. Nonetheless, unravelling a sliced rollout can be faster so we keep this behavior.
         rollout = Rollout(
             self.steps[idx],
             self.n_envs, self._device, _unraveled=self._unraveled,
@@ -309,7 +312,8 @@ class ReplayMemory:
         idxs = np.random.randint(0, len(self), size=batch_dim)
         # create a syntethic rollout with batch data
         # TODO: do we need to copy over references to selected steps objects..?
-        batch = Rollout([0], n_envs=1, _unraveled=True, _shuffle=False)
+        batch = Rollout([0]*batch_dim, n_envs=1,
+                        _unraveled=True, _shuffle=False)
         for attr in ['states', 'actions', 'rewards', 'dones', 'next_states']:
             # select sampled batch indices
             tensor = getattr(
