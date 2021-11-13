@@ -1,9 +1,7 @@
-from os import replace
 import torch
 from typing import Union, List
 from dataclasses import dataclass, field
 import numpy as np
-import random
 
 
 @dataclass
@@ -105,7 +103,7 @@ class Rollout:
                         step_value) is np.ndarray else step_value    
                     getattr(self, '_'+attr)[i] = sv
 
-        # swap attr axes to get desidered shape unravelled or flattened shape
+        # swap attr axes to get desidered unravelled or flattened shape
         if self.n_envs > 0:
 
             if self._shuffle and self._flatten_time:
@@ -198,6 +196,19 @@ class Rollout:
     def __len__(self):
         return len(self.steps)
 
+    def __getitem__(self, idx):
+        rollout = Rollout(
+            self.steps[idx],
+            self.n_envs, self._device, _unraveled=self._unraveled,
+            _shuffle=False, _flatten_time=self._flatten_time)
+        if self._unraveled:
+            # copy over view to unraveled tensors if already computed
+            for attr in [
+                    'states', 'actions', 'rewards', 'dones', 'next_states']:
+                attr_tensor = getattr(self, '_'+attr)
+                setattr(rollout, '_'+attr, attr_tensor[idx])
+        return rollout
+
 
 @dataclass
 class ReplayMemory:
@@ -207,7 +218,6 @@ class ReplayMemory:
     n_envs: int
 
     def __post_init__(self):
-        self.buffer_counter: int = 0
         self.actual_size: int = 0
         self._initialized: bool = False
         self.observations = None 
@@ -221,9 +231,7 @@ class ReplayMemory:
     def _init_buffers(self, rollout: Rollout):
         """Initialize buffers using first rollout info"""
         assert rollout._flatten_time, "ReplayMemory expects tensors of shape `(n_envs*t) x D`, `flatten_time` flag must be set in rollout!"
-        # TODO: add support
-        assert len(
-            rollout)*rollout.n_envs <= self.size, "Rollouts with size greater than memory are not suppored!"
+
         for attr in self._attrs:
             # expect tensor of shape `(n_envs*t) x D`; also maintain dtype
             rtensor = getattr(rollout, attr)
@@ -249,27 +257,23 @@ class ReplayMemory:
 
     def _add_rollout(self, rollout: Rollout):
         """Implements "push to memory" operation simulating a circular buffer with `torch.roll`."""
-        # n_steps = rollout.observations.shape[0]
+        # assuming t*nxD form
         n_steps = len(rollout) * rollout.n_envs
-        free_space = self.size-self.buffer_counter
+        # if trying to push a rollout greater than replay mem size, 
+        # simply skip first elements and avoid overwrite
+        if n_steps > self.size:
+            rollout = rollout[-self.size:]
+            n_steps = self.size
+
         self.actual_size = min(self.actual_size+n_steps, self.size)
-        if n_steps > free_space:
-            # circular buffer strategy, put remaining element at the start and replace old ones
-            # do this for each rollout 'component'
-            for attr in self._attrs:
-                # get reference to tensor object
-                tensor = getattr(self, attr)
-                tensor = torch.roll(tensor, free_space, 0)
-                tensor[:n_steps] = getattr(rollout, attr)
-            self.buffer_counter = n_steps
-        else:
-            # do this for each rollout 'component'
-            for attr in self._attrs:
-                # get reference to tensor object
-                tensor = getattr(self, attr)
-                tensor[self.buffer_counter:self.buffer_counter +
-                       n_steps] = getattr(rollout, attr)
-            self.buffer_counter += n_steps
+        # circular buffer strategy, put remaining element at the start and replace old ones
+        # do this for each rollout 'component'
+        for attr in self._attrs:
+            # get reference to tensor object
+            tensor = getattr(self, attr)
+            tensor = torch.roll(tensor, n_steps, 0)
+            tensor[:n_steps] = getattr(rollout, attr)
+            setattr(self, attr, tensor)
 
     def add_rollouts(self, rollouts: List[Rollout]):
         """
@@ -304,6 +308,7 @@ class ReplayMemory:
             raise ValueError("Sample dimension exceeds current memory size")
         idxs = np.random.randint(0, len(self), size=batch_dim)
         # create a syntethic rollout with batch data
+        # TODO: do we need to copy over references to selected steps objects..?
         batch = Rollout([0], n_envs=1, _unraveled=True, _shuffle=False)
         for attr in ['states', 'actions', 'rewards', 'dones', 'next_states']:
             # select sampled batch indices
@@ -311,7 +316,7 @@ class ReplayMemory:
                 self, attr.replace('states', 'observations')
                 if 'states' in attr else attr)
             setattr(batch, '_'+attr, tensor[idxs].to(device))
-            
+
         return batch
 
     def reset(self):
@@ -319,3 +324,12 @@ class ReplayMemory:
 
     def __len__(self):
         return self.actual_size
+
+    # some aliases
+    @property
+    def states(self):
+        return self.observations
+
+    @property
+    def next_states(self):
+        return self.next_observations
