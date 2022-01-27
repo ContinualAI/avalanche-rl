@@ -7,6 +7,7 @@ import numpy as np
 import multiprocessing
 import types
 from copy import deepcopy
+from ale_py._ale_py import ALEState
 
 # ref https://docs.ray.io/en/master/actors.html#creating-an-actor
 # https://stable-baselines3.readthedocs.io/en/master/guide/vec_envs.html
@@ -73,19 +74,22 @@ class Actor:
         # mostly for degub purpose, you shouldn't need to call this method
         return self.env
 
+    def env_id(self):
+        return id(self.env)
 
 def make_actor_atari_env(
         env_id: str, wrappers: List[Wrapper],
-        atari_state: np.ndarray):
+        atari_state: ALEState):
     from avalanche_rl.benchmarks.generators.rl_benchmark_generators import make_env
-
+    
     # ray shared arrays are read-only objects https://docs.ray.io/en/master/serialization.html#numpy-arrays
     # we need to clone state in actors local memory because of `restore_full_state` which uses `as_ctypes`
     # to convert state which in turn requires the array to be writeable
-    state = np.zeros_like(atari_state, dtype=atari_state.dtype)
-    state[:] = atari_state
+    # NOTE: atari_state behavior was changed so this is no longer needed
+    # state = np.zeros_like(atari_state, dtype=atari_state.dtype)
+    # state[:] = atari_state
     env = make_env(env_id, wrappers=wrappers)
-    env.unwrapped.restore_full_state(state)
+    env.unwrapped.restore_state(atari_state)
 
     return env
 
@@ -119,7 +123,7 @@ class VectorizedEnvironment(object):
                 # copy kept in local for accessing env spec/attrs using this class
                 self.env = envs
                 env_id = envs.spec.id
-                atari_state = envs.unwrapped.clone_full_state()
+                atari_state = envs.unwrapped.clone_state(include_rng=True)
 
                 # actor will instatiate environment locally
                 envs = [make_actor_atari_env for _ in range(n_envs)]

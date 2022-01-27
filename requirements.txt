@@ -2,4 +2,4 @@ avalanche-lib==0.1.0
 ray
 gym[atari, accept-rom-license]==0.21.0
 opencv-python
-atari-py
+atari-py==0.2.9

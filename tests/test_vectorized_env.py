@@ -182,6 +182,8 @@ def test_atari_wrapped():
     with pytest.raises(Exception):
         env.actors[2].reset.step(0)
 
+    assert id(env.actors[0].env_id.remote()) != id(env.actors[1].env_id.remote()) != id(env.actors[2].env_id.remote())
+
     # init observation is always the same
     obs = env.reset()
     assert obs.shape == (
@@ -189,10 +191,12 @@ def test_atari_wrapped():
 
     # first frame we don't move (?)
     env.step(np.asarray([0, 2, 3]))
-    for i in range(10):
+    for i in range(5):
         # pong actions ['NOOP', 'FIRE', 'RIGHT', 'LEFT', 'RIGHTFIRE', 'LEFTFIRE']
         actions = np.array([0, 2, 3], dtype=np.int32)
-        obs, _, done, info = env.step(actions)
+        for _ in range(3):
+            obs, _, done, info = env.step(actions)
+        obs = obs.float()
         # check observations are different
         assert torch.sum(obs[0] - obs[1]).item() != 0 and torch.sum(obs[0] -
                                                                     obs[2]).item() != 0 and torch.sum(obs[1] - obs[2]).item() != 0
