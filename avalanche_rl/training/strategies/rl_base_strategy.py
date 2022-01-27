@@ -36,7 +36,7 @@ class RLBaseStrategy(BaseStrategy):
             criterion=nn.MSELoss(),
             rollouts_per_step: int = 1, max_steps_per_rollout: int = -1,
             updates_per_step: int = 1, device='cpu', max_grad_norm=None,
-            plugins: Optional[Sequence[RLStrategyPlugin]] = [],
+            plugins: Sequence[RLStrategyPlugin] = [],
             discount_factor: float = 0.99, evaluator=default_rl_logger,
             eval_every=-1, eval_episodes: int = 1):
         """
@@ -131,6 +131,7 @@ class RLBaseStrategy(BaseStrategy):
             if isinstance(self.plugins[i], Clock):
                 self.plugins.pop(i)
                 break
+        self.plugins: Sequence[RLStrategyPlugin] = self.plugins
 
     @property
     def current_experience_steps(self) -> Timestep:
@@ -281,12 +282,12 @@ class RLBaseStrategy(BaseStrategy):
             # if isinstance(exp, RLExperience):
             # eval_streams[i] = [exp]
 
-        self.before_training(**kwargs)
+        self._before_training(**kwargs)
         for self.experience in experiences:
             # make sure env is reset on new experience
             self._obs = None
             self.train_exp(self.experience, eval_streams, **kwargs)
-        self.after_training(**kwargs)
+        self._after_training(**kwargs)
 
         self.is_training = False
         res = self.evaluator.get_last_metrics()
@@ -312,7 +313,7 @@ class RLBaseStrategy(BaseStrategy):
         # self.model_adaptation()
         self.make_optimizer()
 
-        self.before_training_exp(**kwargs)
+        self._before_training_exp(**kwargs)
 
         # either run N episodes or steps depending on specified `per_experience_steps`
         for self.timestep in range(self.current_experience_steps.value):
@@ -328,9 +329,9 @@ class RLBaseStrategy(BaseStrategy):
 
                 # Backward
                 self.optimizer.zero_grad()
-                self.before_backward(**kwargs)
+                self._before_backward(**kwargs)
                 self.loss.backward()
-                self.after_backward(**kwargs)
+                self._after_backward(**kwargs)
 
                 # Gradient norm clipping
                 if self.max_grad_norm is not None:
@@ -339,11 +340,11 @@ class RLBaseStrategy(BaseStrategy):
                         self.max_grad_norm)
 
                 # Optimization step
-                self.before_update(**kwargs)
+                self._before_update(**kwargs)
                 self.optimizer.step()
-                self.after_update(**kwargs)
+                self._after_update(**kwargs)
 
-            self.after_training_iteration(**kwargs)
+            self._after_training_iteration(**kwargs)
             # periodic evaluation
             self._periodic_eval(eval_streams, do_final=False)
 
@@ -353,7 +354,7 @@ class RLBaseStrategy(BaseStrategy):
         # Final evaluation
         self._periodic_eval(eval_streams, do_final=(
             self.timestep % self.eval_every != 0))
-        self.after_training_exp(**kwargs)
+        self._after_training_exp(**kwargs)
 
     def _periodic_eval(self, eval_streams, do_final):
         """ Periodic eval controlled by `self.eval_every`. """
@@ -397,7 +398,7 @@ class RLBaseStrategy(BaseStrategy):
         if isinstance(exp_list, RLExperience):
             exp_list: List[RLExperience] = [exp_list]
 
-        self.before_eval(*kwargs)
+        self._before_eval(*kwargs)
         for self.experience in exp_list:
             self.environment = self.experience.environment
             # only single env supported during evaluation
@@ -409,11 +410,11 @@ class RLBaseStrategy(BaseStrategy):
             # Model Adaptation (e.g. freeze/add new units)
             # self.model_adaptation()
 
-            self.before_eval_exp(**kwargs)
+            self._before_eval_exp(**kwargs)
             self.evaluate_exp(**kwargs)
-            self.after_eval_exp(**kwargs)
+            self._after_eval_exp(**kwargs)
 
-        self.after_eval(**kwargs)
+        self._after_eval(**kwargs)
 
         res = self.evaluator.get_last_metrics()
 

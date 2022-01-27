@@ -117,6 +117,8 @@ You can setup Avalanche RL in "dev-mode" by simply cloning this repo and install
     pip install -e .
 ``` 
 
+Be aware that Atari Roms are not included in the installation, please refer to https://github.com/openai/atari-py#roms for details. 
+
 Disclaimer
 ----------------
 This project is under strict development so expect changes on the main branch on a fairly regular basis. As Avalanche itself it's still in its early Alpha versions, it's only fair to say that Avalanche RL is in super-duper Alpha.

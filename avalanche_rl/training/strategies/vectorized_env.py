@@ -1,6 +1,7 @@
 from gym.core import Wrapper
 import ray
 import gym
+from gym.spaces import Space
 from typing import Callable, List, Union, Dict, Any
 import numpy as np
 import multiprocessing
@@ -76,7 +77,7 @@ class Actor:
 def make_actor_atari_env(
         env_id: str, wrappers: List[Wrapper],
         atari_state: np.ndarray):
-    from avalanche.benchmarks.generators.rl_benchmark_generators import make_env
+    from avalanche_rl.benchmarks.generators.rl_benchmark_generators import make_env
 
     # ray shared arrays are read-only objects https://docs.ray.io/en/master/serialization.html#numpy-arrays
     # we need to clone state in actors local memory because of `restore_full_state` which uses `as_ctypes`
@@ -140,8 +141,11 @@ class VectorizedEnvironment(object):
 
         self.action_space = self.env.action_space
         # re-define observation space
+        if not isinstance(self.env.observation_space, Space):
+            raise ValueError("Unrecognized or undefined observation space for the environment. Please make sure to comply with gym.Env interface")
+
         self.observation_space = self.env.observation_space
-        self.observation_space.shape = (n_envs, *self.observation_space.shape)
+        self.observation_space._shape = (n_envs, *self.observation_space.shape)
 
         # NOTE: actor needs to instantiate env locally or we get a double free corruction error (?)
         self.actors = [

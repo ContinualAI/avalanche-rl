@@ -45,6 +45,11 @@ jobs:
       - uses: actions/checkout@v2
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
+      # - name: download atari roms
+      #   run: |
+      #     wget http://www.atarimania.com/roms/Roms.rar
+      #     unar Roms.rar
+      #     python -m atari_py.import_roms Rars/
       - name: install coverage.py and coverralls
         run: |
           pip install coverage

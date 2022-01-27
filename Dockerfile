@@ -6,6 +6,7 @@ RUN apt-get update -y && \
   apt-get install build-essential -y && \
   apt-get install -y wget && \
   apt-get install -y python3-opencv && \
+  apt-get install -y unar && \
   pip install --upgrade pip
 RUN apt-get install git -y
 
