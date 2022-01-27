@@ -5,7 +5,7 @@ LABEL maintainer="nicolo.lucchesi@gmail.com"
 RUN apt-get update -y && \
   apt-get install build-essential -y && \
   apt-get install -y wget && \
-  apt-get install -y libgl1 && \
+  apt-get install -y python3-opencv && \
   pip install --upgrade pip
 RUN apt-get install git -y
 
