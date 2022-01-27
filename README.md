@@ -15,7 +15,7 @@
     <img src="https://www.dropbox.com/s/90thp7at72sh9tj/avalanche_logo_with_clai.png?raw=1"/>
 </p>
 
-**Avalanche RL** is a fork of ContinualAI's Pytorch-based framework [**Avalanche**](https://github.com/ContinualAI/avalanche) with the goal of extending its capabilities to Continual Reinforcement Learning (*CRL*), *bootstrapping* from the work done on Super/Unsupervised Continual Learning.
+**Avalanche RL** is a Pytorch-based framework building upon ContinualAI's [**Avalanche**](https://github.com/ContinualAI/avalanche) with the goal of extending its capabilities to Continual Reinforcement Learning (*CRL*), *bootstrapping* from the work done on Super/Unsupervised Continual Learning.
 
 It should support all environments sharing the `gym.Env` interface, handle stream of experiences, provide strategies for RL algorithms and enable fast prototyping through an extremely flexible and customizable API. 
 
@@ -32,6 +32,10 @@ Head over to [Avalanche Website](https://avalanche.continualai.org) to learn mor
 ## Features
 ___
 Features added so far in this fork can be summarized and grouped by module.
+<p align="center">
+    <img src="assets/diagram.png"/>
+</p>
+
 ### *Benchmarks*
 [RLScenario](https://github.com/NickLucche/avalanche/blob/master/avalanche/benchmarks/rl_benchmark.py) introduces a Benchmark for RL which augments each experience with an 'Environment' (defined through [OpenAI `gym.Env` interface](https://github.com/openai/gym/blob/120e21cd75db36cce241f1b3a23184d3876c9753/gym/core.py#L8)) effectively implementing a "stream of environments" with which the agent can interact to generate data and learn from that interaction during each experience. This concept models the way experiences in the supervised CL context are translated to CRL, moving away from the concept of Dataset toward a dynamic interaction through which data is generated.
 
@@ -102,12 +106,20 @@ Check out more examples [here](https://github.com/NickLucche/avalanche/blob/mast
 
 ## Installation
 ______________
-As this fork is still under development, the advised way to install it is to simply clone this repo `git clone https://github.com/NickLucche/avalanche.git` and then just follow avalanche guide to [install as developer](https://avalanche.continualai.org/getting-started/how-to-install#developer-mode-install). Spoiler, just run `conda env update --file environment-dev.yml` to update your current environment with avalanche-rl dependencies.
-Currently, the only added dependency is `ray`.
+`pip install git+https://github.com/ContinualAI/avalanche-rl.git` for installing the latest available version from the master branch.
+Alternatively, you can build the Dockerfile in this repo yourself or run the one on DockerHub with `docker run -it --rm nicklucche/avalanche-rl:latest bash`. 
+
+You can setup Avalanche RL in "dev-mode" by simply cloning this repo and install it using pip:  
+```
+    git clone https://github.com/ContinualAI/avalanche-rl
+    cd avalanche-rl
+    pip install -r requirements.txt
+    pip install -e .
+``` 
 
 Disclaimer
 ----------------
-This fork is under strict development so expect changes on the main branch on a fairly regular basis. As Avalanche itself it's still in its early Alpha versions, it's only fair to say that Avalanche RL is in super-duper pre-Alpha.
+This project is under strict development so expect changes on the main branch on a fairly regular basis. As Avalanche itself it's still in its early Alpha versions, it's only fair to say that Avalanche RL is in super-duper Alpha.
 
 We believe there's lots of room for improvements and tweaking but at the same time there's much that can be offered to the growing community of continual learning practitioners approaching reinforcement learning by allowing to perform experiments under a common framework with a well-defined structure.
 

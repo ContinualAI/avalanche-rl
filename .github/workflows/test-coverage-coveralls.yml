@@ -29,11 +29,11 @@ on:
 
 jobs:
   unit-test:
-    if: github.repository == 'ContinualAI/avalanche'
+    if: github.repository == 'ContinualAI/avalanche-rl'
     name: unit test
     runs-on: ubuntu-latest
     container:
-      image: ggraffieti/avalanche-ds:latest
+      image: nicklucche/avalanche-rl:latest
     strategy:
       fail-fast: false
       matrix:
@@ -45,35 +45,18 @@ jobs:
       - uses: actions/checkout@v2
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-      - name: copy dataset in correct folder
-        run: cp -r /~/.avalanche /github/home
-      - name: install conda environment < 3.9
-        if: matrix.python-version != '3.9'
-        run: |
-          conda create -n avalanche-env python=${{ matrix.python-version }} -c conda-forge
-          conda activate avalanche-env
-          conda install pytorch=1.8.1 torchvision=0.9.1 cpuonly -c pytorch -y
-          conda env update --file environment.yml
-      - name: install conda environment = 3.9
-        if: matrix.python-version == '3.9'
-        run: |
-          conda create -n avalanche-env python=${{ matrix.python-version }} -c conda-forge
-          conda activate avalanche-env
-          conda install pytorch torchvision cpuonly -c pytorch -c=conda-forge -y
-          conda env update --file environment.yml
       - name: install coverage.py and coverralls
         run: |
-          conda activate avalanche-env
           pip install coverage
           pip install coveralls
+          pip install pytest
+          pip install pytest-cov
       - name: python unit test
         id: unittest
         run: |
-          conda activate avalanche-env
-          FAST_TEST=True USE_GPU=False coverage run -m unittest
+          coverage run -m pytest
       - name: Upload coverage data to coveralls.io
         run: |
-          conda activate avalanche-env
           coveralls --service=github
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -81,7 +64,7 @@ jobs:
           COVERALLS_PARALLEL: true
 
   coveralls:
-    if: github.repository == 'ContinualAI/avalanche'
+    if: github.repository == 'ContinualAI/avalanche-rl'
     name: Indicate completion to coveralls.io
     needs: unit-test
     runs-on: ubuntu-latest

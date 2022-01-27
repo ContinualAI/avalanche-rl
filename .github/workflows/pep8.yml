@@ -48,7 +48,7 @@ jobs:
       - name: check pep8 in source files
         run: pycodestyle avalanche tests examples > pep8_report.txt
       - name: send PR message
-        if: failure() && github.event_name == 'pull_request_target' && github.repository == 'ContinualAI/avalanche'
+        if: failure() && github.event_name == 'pull_request_target' && github.repository == 'ContinualAI/avalanche-rl'
         uses: actions/github-script@v3
         with:
           github-token: ${{ secrets.BOT_TOKEN }}

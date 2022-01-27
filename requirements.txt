@@ -1,0 +1,4 @@
+avalanche-lib
+ray
+gym
+opencv-python

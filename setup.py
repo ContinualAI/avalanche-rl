@@ -2,6 +2,8 @@ import setuptools
 import codecs
 import os.path
 
+_VERSION = "0.0.1"
+
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
@@ -23,10 +25,10 @@ def get_version(rel_path):
 
 setuptools.setup(
     name="avalanche-rl", 
-    version=get_version("avalanche/__init__.py"),
+    version=_VERSION,
     author="ContinualAI",
     author_email="contact@continualai.org",
-    description="Avalanche RL: Avalanche fork adding RL support.",
+    description="Avalanche RL: an End-to-End Library for Continual Reinforcement Learning.",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/ContinualAI/avalanche-rl",
@@ -36,18 +38,10 @@ setuptools.setup(
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
-    python_requires='>=3.6,<=3.9.2',
+    # python_requires='>=3.6,<=3.9.2',
     install_requires=[
-        'typing-extensions',
-        'psutil',
-        'gputil',
-        'scikit-learn',
-        'matplotlib',
-        'numpy',
-        'pytorchcv',
-        'quadprog',
-        'wandb',
-        'tensorboard',
-        'pycocotools'
+        'avalanche-lib',
+        'gym',
+        'ray',
     ]
 )
