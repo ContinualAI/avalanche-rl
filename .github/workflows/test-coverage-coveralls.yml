@@ -34,6 +34,7 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: nicklucche/avalanche-rl:latest
+      options: --user root
     strategy:
       fail-fast: false
       matrix:

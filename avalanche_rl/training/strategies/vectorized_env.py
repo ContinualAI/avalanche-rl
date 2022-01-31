@@ -77,11 +77,12 @@ class Actor:
     def env_id(self):
         return id(self.env)
 
+
 def make_actor_atari_env(
         env_id: str, wrappers: List[Wrapper],
         atari_state: ALEState):
     from avalanche_rl.benchmarks.generators.rl_benchmark_generators import make_env
-    
+
     # ray shared arrays are read-only objects https://docs.ray.io/en/master/serialization.html#numpy-arrays
     # we need to clone state in actors local memory because of `restore_full_state` which uses `as_ctypes`
     # to convert state which in turn requires the array to be writeable
@@ -146,7 +147,8 @@ class VectorizedEnvironment(object):
         self.action_space = self.env.action_space
         # re-define observation space
         if not isinstance(self.env.observation_space, Space):
-            raise ValueError("Unrecognized or undefined observation space for the environment. Please make sure to comply with gym.Env interface")
+            raise ValueError(
+                "Unrecognized or undefined observation space for the environment. Please make sure to comply with gym.Env interface")
 
         self.observation_space = self.env.observation_space
         self.observation_space._shape = (n_envs, *self.observation_space.shape)
