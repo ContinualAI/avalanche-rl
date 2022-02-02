@@ -182,7 +182,8 @@ def test_atari_wrapped():
     with pytest.raises(Exception):
         env.actors[2].reset.step(0)
 
-    assert id(env.actors[0].env_id.remote()) != id(env.actors[1].env_id.remote()) != id(env.actors[2].env_id.remote())
+    assert id(env.actors[0].env_id.remote()) != id(
+        env.actors[1].env_id.remote()) != id(env.actors[2].env_id.remote())
 
     # init observation is always the same
     obs = env.reset()
