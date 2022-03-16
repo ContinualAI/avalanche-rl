@@ -41,8 +41,8 @@ class Actor:
             [type]: [description]
         """
         # try casting to numpy array
-        # if type(action) is not np.ndarray:
-        # action = np.array(action)
+        if type(action) is np.ndarray and action.size == 1:
+            action = action.item()
 
         next_obs, reward, done, info = self.env.step(action)
         # auto-reset episode: obs you get is actually the first of the new episode, 

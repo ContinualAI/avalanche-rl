@@ -34,7 +34,7 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: nicklucche/avalanche-rl:latest
-      options: --user root
+      # options: --user root
     strategy:
       fail-fast: false
       matrix:
@@ -53,6 +53,7 @@ jobs:
       #     python -m atari_py.import_roms Rars/
       - name: install coverage.py and coverralls
         run: |
+          export PATH="/home/avalanche-user/.local/bin:$PATH"
           pip install coverage
           pip install coveralls
           pip install pytest
@@ -61,24 +62,24 @@ jobs:
         id: unittest
         run: |
           coverage run -m pytest
-      - name: Upload coverage data to coveralls.io
-        run: |
-          coveralls --service=github
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          COVERALLS_FLAG_NAME: ${{ matrix.python-version }}
-          COVERALLS_PARALLEL: true
+  #     - name: Upload coverage data to coveralls.io
+  #       run: |
+  #         coveralls --service=github
+  #       env:
+  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  #         COVERALLS_FLAG_NAME: ${{ matrix.python-version }}
+  #         COVERALLS_PARALLEL: true
 
-  coveralls:
-    if: github.repository == 'ContinualAI/avalanche-rl'
-    name: Indicate completion to coveralls.io
-    needs: unit-test
-    runs-on: ubuntu-latest
-    container: python:3-slim
-    steps:
-      - name: Finished
-        run: |
-          pip3 install --upgrade coveralls
-          coveralls --finish
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  # coveralls:
+  #   if: github.repository == 'ContinualAI/avalanche-rl'
+  #   name: Indicate completion to coveralls.io
+  #   needs: unit-test
+  #   runs-on: ubuntu-latest
+  #   container: python:3-slim
+  #   steps:
+  #     - name: Finished
+  #       run: |
+  #         pip3 install --upgrade coveralls
+  #         coveralls --finish
+  #       env:
+  #         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

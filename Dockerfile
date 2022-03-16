@@ -12,6 +12,7 @@ RUN apt-get install git -y
 
 # add a user or pip will complain
 RUN adduser avalanche-user
+RUN chown avalanche-user: /
 USER avalanche-user
 COPY --chown=avalanche-user:avalanche-user . /home/avalanche-user/app 
 
