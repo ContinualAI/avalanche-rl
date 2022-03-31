@@ -10,12 +10,17 @@ RUN apt-get update -y && \
   pip install --upgrade pip
 RUN apt-get install git -y
 
-# add a user or pip will complain
-RUN adduser avalanche-user
-RUN chown avalanche-user: /
-USER avalanche-user
-COPY --chown=avalanche-user:avalanche-user . /home/avalanche-user/app 
+# RUN adduser avalanche-user
+# RUN chown avalanche-user: /
+# USER avalanche-user
+# COPY --chown=avalanche-user:avalanche-user . /home/avalanche-user/app 
+COPY . /app 
 
-WORKDIR /home/avalanche-user/app
-RUN pip install --user -r requirements.txt
-RUN pip install --user .
+# WORKDIR /home/avalanche-user/app
+WORKDIR /app
+RUN python -m venv venv
+# Enable venv
+ENV PATH="/app/venv/bin:$PATH"
+
+RUN pip install -r requirements.txt
+RUN pip install .

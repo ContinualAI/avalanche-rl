@@ -34,7 +34,7 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: nicklucche/avalanche-rl:latest
-      # options: --user root
+      options: --user root
     strategy:
       fail-fast: false
       matrix:
@@ -52,8 +52,8 @@ jobs:
       #     unar Roms.rar
       #     python -m atari_py.import_roms Rars/
       - name: install coverage.py and coverralls
+        # export PATH="/home/avalanche-user/.local/bin:$PATH"
         run: |
-          export PATH="/home/avalanche-user/.local/bin:$PATH"
           pip install coverage
           pip install coveralls
           pip install pytest
