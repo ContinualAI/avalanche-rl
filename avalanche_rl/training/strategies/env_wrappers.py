@@ -193,3 +193,17 @@ class VectorizedEnvWrapper(Wrapper):
     def reset(self) -> Any:
         obs = super().reset()
         return self._unsqueeze_obs(obs)
+
+    @property
+    def num_envs(self):
+        return 1
+
+
+class TransposeImageWrapper(ObservationWrapper):
+    
+    def observation(self, observation: np.ndarray) -> np.ndarray:
+        if observation.ndim == 3:
+            return torch.transpose(observation, (2, 0, 1))
+            
+        assert len(observation.shape) == 4, observation.shape
+        return torch.transpose(observation, (0, 3, 1, 2))

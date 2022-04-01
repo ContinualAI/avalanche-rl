@@ -201,3 +201,8 @@ class VectorizedEnvironment(object):
         promises = [actor.close.remote() for actor in self.actors]
         ray.wait(promises)
         ray.shutdown()
+
+    @property
+    def num_envs(self):
+        # comply with sb3 interface
+        return self.n_envs

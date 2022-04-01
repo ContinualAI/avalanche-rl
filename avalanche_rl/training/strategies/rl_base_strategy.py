@@ -141,6 +141,14 @@ class RLBaseStrategy(BaseStrategy):
         return self.per_experience_steps[self.experience.current_experience %
                                          len(self.per_experience_steps)]
 
+    @property
+    def current_observation_space(self) -> gym.Space:
+        return self.environment.observation_space
+
+    @property
+    def current_action_space(self) -> gym.Space:
+        return self.environment.action_space
+
     # Additional callback added by RLBaseStrategy
     def before_rollout(self, **kwargs):
         for p in self.plugins:
@@ -220,6 +228,13 @@ class RLBaseStrategy(BaseStrategy):
                 self.rewards['past_returns'].append(
                     self.rewards['curr_returns'][env_done])
                 self.rewards['curr_returns'][env_done] = 0.
+
+            # TODO: should we return the actual final obs?
+            # next_obss, rewards, dones, infos = env.step(actions)
+            # resulting_obss = [
+            #     info["terminal_observation"] if done else next_obs
+            #     for info, done, next_obs in zip(infos, dones, next_obss)
+            # ]
 
             # Vectorized env auto resets on done by default, check this flag to count episodes
             if n_rollouts > 0:

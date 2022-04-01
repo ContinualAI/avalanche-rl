@@ -13,12 +13,12 @@ def rl_experience_factory(
     if stream.name == 'train':
         # supports even a different number of parallel envs per experience 
         return RLExperience(
-            stream, exp_idx, stream.scenario.envs[exp_idx],
-            stream.scenario.n_envs[exp_idx])
+            stream, exp_idx, stream.benchmark.envs[exp_idx],
+            stream.benchmark.n_envs[exp_idx])
     elif stream.name == 'test':
         # only support single env
         return RLExperience(
-            stream, exp_idx, stream.scenario.eval_envs[exp_idx],
+            stream, exp_idx, stream.benchmark.eval_envs[exp_idx],
             1)
 
 
@@ -221,4 +221,4 @@ class RLExperience(GenericExperience[RLScenario,
 
     @property
     def task_labels(self) -> List[int]:
-        return [self.scenario.train_task_labels[self.current_experience]]
+        return [self.benchmark.train_task_labels[self.current_experience]]
