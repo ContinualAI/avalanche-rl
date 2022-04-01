@@ -43,6 +43,14 @@ jobs:
       run:
         shell: bash -l {0}
     steps:
+      - run: | 
+          whoami
+          echo $(pwd)
+          ls
+          which python
+          python -c 'import sys; print(sys.version_info[:])'
+          which pip
+      - run: python -c 'import avalanche_rl; print(avalanche_rl.__version__)'
       - uses: actions/checkout@v2
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
