@@ -50,7 +50,11 @@ jobs:
           which python
           python -c 'import sys; print(sys.version_info[:])'
           which pip
-      - run: python -c 'import avalanche_rl; print(avalanche_rl.__version__)'
+          echo "VIRTUAL ENV:" $VIRTUAL_ENV
+      - run: |
+          source /app/venv/bin/activate
+          echo "VIRTUAL ENV:" $VIRTUAL_ENV
+          python -c 'import avalanche_rl; print(avalanche_rl.__version__)'
       - uses: actions/checkout@v2
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
