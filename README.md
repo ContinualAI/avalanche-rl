@@ -2,13 +2,8 @@
     
 # Avalanche RL: an End-to-End Library for Continual Reinforcement Learning
 <!-- # Avalanche: an End-to-End Library for Continual Learning -->
-**[Avalanche Website](https://avalanche.continualai.org)** | **[Getting Started](https://avalanche.continualai.org/getting-started)** | **[Examples](https://avalanche.continualai.org/examples)** | **[Tutorial](https://avalanche.continualai.org/from-zero-to-hero-tutorial)** | **[API Doc](https://avalanche-api.continualai.org)** | **[Paper](https://arxiv.org/abs/2104.00405)** | **[Twitter](https://twitter.com/AvalancheLib)**
+**[Avalanche Website](https://avalanche.continualai.org)** | **[Paper](https://arxiv.org/abs/2202.13657)**
 
-[![unit test](https://github.com/ContinualAI/avalanche/actions/workflows/unit-test.yml/badge.svg)](https://github.com/ContinualAI/avalanche/actions/workflows/unit-test.yml)
-[![syntax checking](https://github.com/ContinualAI/avalanche/actions/workflows/syntax.yml/badge.svg)](https://github.com/ContinualAI/avalanche/actions/workflows/syntax.yml)
-[![PEP8 checking](https://github.com/ContinualAI/avalanche/actions/workflows/pep8.yml/badge.svg)](https://github.com/ContinualAI/avalanche/actions/workflows/pep8.yml)
-[![docstring coverage](https://github.com/ContinualAI/avalanche-report/blob/main/badge/interrogate-badge.svg)](https://github.com/ContinualAI/avalanche-report/blob/main/docstring_coverage/documentation-coverage.txt)
-[![Coverage Status](https://coveralls.io/repos/github/ContinualAI/avalanche/badge.svg)](https://coveralls.io/github/ContinualAI/avalanche)
 </div>
 
 <p align="center">
@@ -124,4 +119,21 @@ Disclaimer
 This project is under strict development so expect changes on the main branch on a fairly regular basis. As Avalanche itself it's still in its early Alpha versions, it's only fair to say that Avalanche RL is in super-duper Alpha.
 
 We believe there's lots of room for improvements and tweaking but at the same time there's much that can be offered to the growing community of continual learning practitioners approaching reinforcement learning by allowing to perform experiments under a common framework with a well-defined structure.
+
+Cite Avalanche RL
+----------------
+If you used Avalanche RL in your research project, please remember to cite our reference paper published at [ICIAP2021](https://www.iciap2021.org/): ["Avalanche RL: a Continual Reinforcement Learning Library"](https://arxiv.org/abs/2104.00405). 
+
+```
+@misc{https://doi.org/10.48550/arxiv.2202.13657,
+  doi = {10.48550/ARXIV.2202.13657},
+  url = {https://arxiv.org/abs/2202.13657},
+  author = {Lucchesi, Nicolò and Carta, Antonio and Lomonaco, Vincenzo and Bacciu, Davide},
+  keywords = {Machine Learning (cs.LG), Artificial Intelligence (cs.AI), Computer Vision and Pattern Recognition (cs.CV), FOS: Computer and information sciences, FOS: Computer and information sciences},
+  title = {Avalanche RL: a Continual Reinforcement Learning Library},
+  publisher = {arXiv},
+  year = {2022},
+  copyright = {Creative Commons Attribution 4.0 International}
+}
+```
 
