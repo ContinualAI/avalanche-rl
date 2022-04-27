@@ -122,7 +122,7 @@ We believe there's lots of room for improvements and tweaking but at the same ti
 
 Cite Avalanche RL
 ----------------
-If you used Avalanche RL in your research project, please remember to cite our reference paper published at [ICIAP2021](https://www.iciap2021.org/): ["Avalanche RL: a Continual Reinforcement Learning Library"](https://arxiv.org/abs/2104.00405). 
+If you used Avalanche RL in your research project, please remember to cite our reference paper published at [ICIAP2021](https://www.iciap2021.org/): ["Avalanche RL: a Continual Reinforcement Learning Library"](https://arxiv.org/abs/2202.13657). 
 
 ```
 @misc{https://doi.org/10.48550/arxiv.2202.13657,
