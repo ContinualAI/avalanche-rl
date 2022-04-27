@@ -7,8 +7,8 @@ import torch
 import torch.nn as nn
 from torch.optim.optimizer import Optimizer
 from gym import Env
-from avalanche.training.strategies.base_strategy import BaseStrategy
-from avalanche_rl.benchmarks.rl_benchmark import RLExperience, RLScenario
+from avalanche_rl.compat import BaseStrategy
+from avalanche.benchmarks.scenarios.rl_scenario import RLExperience
 from avalanche_rl.training.plugins.strategy_plugin import RLStrategyPlugin
 from avalanche_rl.training.strategies.env_wrappers import *
 from avalanche_rl.training import default_rl_logger

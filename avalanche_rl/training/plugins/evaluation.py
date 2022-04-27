@@ -1,4 +1,4 @@
-from avalanche.training.strategies import BaseStrategy
+from avalanche_rl.compat import BaseStrategy
 from avalanche.training.plugins.evaluation import EvaluationPlugin
 
 

@@ -129,14 +129,20 @@ def gym_benchmark_generator(
             "Unrecognized type for `eval_envs`, make sure to pass a list of environments or of environment names.")
 
     # envs will be cycled through if n_experiences > len(envs_) otherwise only the first n will be used
-    n_experiences = n_experiences if n_experiences is not None else len(envs_)         
+    n_experiences = n_experiences or len(envs_)         
+    if n_experiences < len(envs_):
+        envs_ = envs_[:n_experiences]
+    elif n_experiences > len(envs_):
+        # cycle through envs sequentially, referencing same object
+        for i in range(n_experiences - len(envs_)):
+            envs_.append(envs_[i % len(envs_)])
     # # per_experience_episodes variable number of episodes depending on env
     # if type(per_experience_episodes) is list:
     #     assert len(per_experience_episodes) == n_experiences
 
-    return RLScenario(
-        envs=envs_, n_experiences=n_experiences,
-        n_parallel_envs=n_parallel_envs, eval_envs=eval_envs, wrappers_generators=wrappers, *args, **kwargs)
+    return RLScenario(envs=envs_, n_parallel_envs=n_parallel_envs, 
+                      eval_envs=eval_envs, wrappers_generators=wrappers,
+                      *args, **kwargs)
 
 
 def atari_benchmark_generator(
@@ -282,6 +288,5 @@ if importlib.util.find_spec('continual_habitat_lab') is not None and importlib.u
         # also return computed number of steps per experience
         # NOTE: parallel_env only supported on distributed settings due to opengl lock
         return RLScenario(
-            envs=[env],
-            n_experiences=n_exps, n_parallel_envs=1, eval_envs=[env],
+            envs=[env], n_parallel_envs=1, eval_envs=[env],
             *args, **kwargs), steps_per_experience

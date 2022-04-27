@@ -1,8 +1,8 @@
-from avalanche.training.plugins.strategy_plugin import StrategyPlugin
-from avalanche.training.strategies import BaseStrategy
+from avalanche.core import BasePlugin
+from avalanche_rl.compat import BaseStrategy
 
 
-class RLStrategyPlugin(StrategyPlugin):
+class RLStrategyPlugin(BasePlugin):
     """
     Implements RL-specific callbacks.
     """

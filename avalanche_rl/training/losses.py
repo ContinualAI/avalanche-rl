@@ -1,7 +1,7 @@
 import copy
 
 import torch
-from avalanche.training.plugins import StrategyPlugin
+from avalanche.core import BasePlugin
 from torch.nn import BCELoss
 import numpy as np
 

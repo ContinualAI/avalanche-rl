@@ -1,6 +1,7 @@
 from avalanche.evaluation.metric_definitions import PluginMetric, TResult
 from avalanche.evaluation.metric_results import MetricResult
-from avalanche.training.strategies.base_strategy import BaseStrategy
+# from avalanche.training.strategies.base_strategy import BaseStrategy
+from avalanche_rl.compat import BaseStrategy
 
 
 class RLPluginMetric(PluginMetric[TResult]):

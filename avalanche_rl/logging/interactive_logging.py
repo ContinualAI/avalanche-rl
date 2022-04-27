@@ -3,7 +3,7 @@ from avalanche.evaluation.metric_results import MetricValue
 from avalanche.evaluation.metric_utils import stream_type
 from avalanche.logging.interactive_logging import InteractiveLogger
 from tqdm import tqdm
-from avalanche.training import BaseStrategy
+from avalanche_rl.compat import BaseStrategy
 
 from avalanche_rl.logging.strategy_logger import RLStrategyLogger
 

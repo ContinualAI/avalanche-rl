@@ -1,10 +1,10 @@
 from avalanche.evaluation.metric_results import MetricValue
-from avalanche.logging.strategy_logger import StrategyLogger
+from avalanche.logging import BaseLogger
 from typing import List
-from avalanche.training.strategies import BaseStrategy
+from avalanche_rl.compat import BaseStrategy
 
 
-class RLStrategyLogger(StrategyLogger):
+class RLStrategyLogger(BaseLogger):
     """
     Strategy logger adding RL-specific callbacks.
     """

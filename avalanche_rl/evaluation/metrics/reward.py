@@ -3,7 +3,7 @@ from avalanche_rl.evaluation.metric_definitions import RLPluginMetric
 from avalanche.evaluation.metric_definitions import MetricValue, GenericPluginMetric
 from avalanche.evaluation.metric_results import MetricResult
 from avalanche_rl.evaluation.metrics.mean import WindowedMovingAverage
-from avalanche.training.strategies.base_strategy import BaseStrategy
+from avalanche_rl.compat import BaseStrategy
 from typing import Dict, Union, List
 import numpy as np
 
