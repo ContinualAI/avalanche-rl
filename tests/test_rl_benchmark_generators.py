@@ -17,9 +17,9 @@ def test_task_label(n_exps):
     envs = ['CartPole-v1', 'MountainCar-v0', 'Acrobot-v1']
     scenario = gym_benchmark_generator(
         envs, n_experiences=n_exps, eval_envs=envs[:2])
+    print([scenario.train_stream[e].task_label for e in range(n_exps)])
     for exp_no in range(n_exps):
-        assert scenario.train_stream[exp_no].task_label == (
-            exp_no % scenario._num_original_envs)
+        assert scenario.train_stream[exp_no].task_label == exp_no % len(envs)
         assert scenario.train_stream[exp_no].environment.spec.id == envs[exp_no % len(
             envs)] 
 
@@ -37,8 +37,7 @@ def test_atari_task_label(n_exps):
         envs, frame_stacking=True, normalize_observations=True,
         terminal_on_life_loss=True, n_experiences=n_exps, eval_envs=envs[: 2])
     for exp_no in range(n_exps):
-        assert scenario.train_stream[exp_no].task_label == (
-            exp_no % scenario._num_original_envs)
+        assert scenario.train_stream[exp_no].task_label == exp_no % len(envs)
         assert scenario.train_stream[exp_no].environment.spec.id == envs[exp_no % len(
             envs)] 
 

@@ -2,14 +2,14 @@ from continual_habitat_lab.utils import suppress_habitat_logging
 suppress_habitat_logging()
 from habitat_sim.logging import logger
 logger.propagate = False
-from avalanche.training.strategies.reinforcement_learning.rl_base_strategy import RLBaseStrategy
-from avalanche.training.plugins.strategy_plugin import StrategyPlugin
+from avalanche_rl.training.strategies import RLBaseStrategy
+from avalanche.core import BasePlugin
 from gym.core import ObservationWrapper
-from avalanche.models.dqn import ConvDeepQN
-from avalanche.models.actor_critic import ActorCriticMLP, ConvActorCritic
-from avalanche.training.strategies.reinforcement_learning.actor_critic import A2CStrategy
+from avalanche_rl.models.dqn import ConvDeepQN
+from avalanche_rl.models.actor_critic import ActorCriticMLP, ConvActorCritic
+from avalanche_rl.training.strategies.actor_critic import A2CStrategy
 
-from avalanche.benchmarks.generators.rl_benchmark_generators import habitat_benchmark_generator
+from avalanche_rl.benchmarks.generators.rl_benchmark_generators import habitat_benchmark_generator
 from continual_habitat_lab import ContinualHabitatLabConfig, ContinualHabitatEnv
 from omegaconf import OmegaConf
 from torch.optim import Adam
@@ -37,7 +37,7 @@ class HabitatObservations(ObservationWrapper):
         return observation['rgba'][..., :3].transpose(2, 0, 1)
 
 
-class HabitatPlugin(StrategyPlugin):
+class HabitatPlugin(BasePlugin):
     def __init__(self, max_steps: int = None):
         super().__init__()
         self.max_steps = max_steps

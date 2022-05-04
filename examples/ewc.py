@@ -14,9 +14,9 @@ from avalanche_rl.training.strategies.dqn import DQNStrategy, default_dqn_logger
 from avalanche_rl.training.strategies.env_wrappers import ReducedActionSpaceWrapper
 from avalanche_rl.benchmarks.generators.rl_benchmark_generators import atari_benchmark_generator
 from avalanche_rl.training.plugins.ewc import EWCRL
-from avalanche_rl.logging import TextLogger
+# from avalanche_rl.logging import TextLogger
 from avalanche_rl.models.dqn import EWCConvDeepQN
-from avalanche_rl.training.plugins.strategy_plugin import StrategyPlugin
+from avalanche.core import BasePlugin
 from avalanche_rl.training.strategies.rl_base_strategy import Timestep
 from avalanche_rl.evaluation.metrics.reward import GenericFloatMetric
 import json
@@ -48,7 +48,7 @@ if __name__ == "__main__":
                        start_ewc_after_experience=2)
 
     # log to file
-    file_logger = TextLogger(open('ewc_log.txt', 'w'))
+    # file_logger = TextLogger(open('ewc_log.txt', 'w'))
 
     # keep track of the loss
     ewc_penalty_metric = GenericFloatMetric(
@@ -57,7 +57,7 @@ if __name__ == "__main__":
 
     evaluator = EvaluationPlugin(
         *default_dqn_logger.metrics, ewc_penalty_metric,
-        loggers=default_dqn_logger.loggers + [file_logger])
+        loggers=default_dqn_logger.loggers)
 
     # here we'll have task-specific biases & gains per layer (2 since we're learning 2 games)
     model = EWCConvDeepQN(4, (84, 84), action_space, n_tasks=2, bias=True)
@@ -66,7 +66,7 @@ if __name__ == "__main__":
 
     # a custom plugin to show some functionalities: halve inital epsilon (for eps-greedy action-selection)
     # every two training experiences, so that more exploit is done
-    class HalveEps(StrategyPlugin):
+    class HalveEps(BasePlugin):
 
         def __init__(self):
             super().__init__()
