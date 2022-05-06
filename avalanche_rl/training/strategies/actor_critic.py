@@ -4,7 +4,7 @@ from .rl_base_strategy import RLBaseStrategy, Timestep, TimestepUnit
 from .buffers import Rollout
 from torch.optim.optimizer import Optimizer
 from typing import Union, Optional, Sequence, List
-from avalanche_rl.training.plugins.strategy_plugin import RLStrategyPlugin
+from avalanche_rl.training.plugins.strategy_plugin import RLPlugin
 from torch.optim import Optimizer
 from torch.distributions import Categorical
 from avalanche_rl.training import default_rl_logger
@@ -19,7 +19,7 @@ class A2CStrategy(RLBaseStrategy):
             max_steps_per_rollout: int = 5,
             value_criterion=nn.MSELoss(),
             device='cpu',
-            plugins: Optional[Sequence[RLStrategyPlugin]] = [],
+            plugins: Optional[Sequence[RLPlugin]] = [],
             eval_every: int = -1, eval_episodes: int = 1, 
             policy_loss_weight: float = 0.5,
             value_loss_weight: float = 0.5,

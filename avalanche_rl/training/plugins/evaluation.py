@@ -11,7 +11,7 @@ class RLEvaluationPlugin(EvaluationPlugin):
         super().__init__(*args, **kwargs)
 
     def before_rollout(self, strategy: 'BaseStrategy', **kwargs):
-        self._update_metrics(strategy, 'before_rollout')
+        self._update_metrics_and_loggers(strategy, 'before_rollout')
 
     def after_rollout(self, strategy: 'BaseStrategy', **kwargs):
-        self._update_metrics(strategy, 'after_rollout')
+        self._update_metrics_and_loggers(strategy, 'after_rollout')

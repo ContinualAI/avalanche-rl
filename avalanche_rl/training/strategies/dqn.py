@@ -5,7 +5,7 @@ from .rl_base_strategy import RLBaseStrategy, Timestep
 from .buffers import Rollout, ReplayMemory
 from torch.optim.optimizer import Optimizer
 from typing import Union, Optional, Sequence, List
-from avalanche.core import BasePlugin
+from avalanche_rl.training.plugins.strategy_plugin import RLPlugin
 from torch.optim import Optimizer
 import copy
 import random
@@ -41,7 +41,7 @@ class DQNStrategy(RLBaseStrategy):
             target_net_update_interval: Union[int, Timestep] = 10000,
             polyak_update_tau: float = 1.,  # set to 1. to hard copy
             device='cpu',
-            plugins: Optional[Sequence[BasePlugin]] = [],
+            plugins: Optional[Sequence[RLPlugin]] = [],
             reset_replay_on_new_experience: bool = True,
             initial_replay_memory: ReplayMemory = None,
             evaluator=default_dqn_logger, **kwargs):

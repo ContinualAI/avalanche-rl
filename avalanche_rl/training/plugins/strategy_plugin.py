@@ -2,7 +2,7 @@ from avalanche.core import BasePlugin
 from avalanche_rl.compat import BaseStrategy
 
 
-class RLStrategyPlugin(BasePlugin):
+class RLPlugin(BasePlugin):
     """
     Implements RL-specific callbacks.
     """

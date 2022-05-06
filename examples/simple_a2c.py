@@ -29,9 +29,9 @@ if __name__ == "__main__":
         print("Start of experience ", experience.current_experience)
         print("Current Env ", experience.env)
         print("Current Task", experience.task_label, type(experience.task_label))
-        strategy.train(experience, scenario.test_stream)
+        strategy.train(experience, scenario.eval_stream)
 
     print('Training completed')
     eval_episodes = 100
     print(f"\nEvaluating on {eval_episodes} episodes!")
-    print(strategy.eval(scenario.test_stream))
+    print(strategy.eval(scenario.eval_stream))

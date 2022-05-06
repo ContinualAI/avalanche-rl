@@ -9,7 +9,7 @@ from torch.optim.optimizer import Optimizer
 from gym import Env
 from avalanche_rl.compat import BaseStrategy
 from avalanche.benchmarks.scenarios.rl_scenario import RLExperience
-from avalanche_rl.training.plugins.strategy_plugin import RLStrategyPlugin
+from avalanche_rl.training.plugins.strategy_plugin import RLPlugin
 from avalanche_rl.training.strategies.env_wrappers import *
 from avalanche_rl.training import default_rl_logger
 from avalanche_rl.training.strategies.vectorized_env import VectorizedEnvironment
@@ -36,7 +36,7 @@ class RLBaseStrategy(BaseStrategy):
             criterion=nn.MSELoss(),
             rollouts_per_step: int = 1, max_steps_per_rollout: int = -1,
             updates_per_step: int = 1, device='cpu', max_grad_norm=None,
-            plugins: Sequence[RLStrategyPlugin] = [],
+            plugins: Sequence[RLPlugin] = [],
             discount_factor: float = 0.99, evaluator=default_rl_logger,
             eval_every=-1, eval_episodes: int = 1):
         """
@@ -131,7 +131,7 @@ class RLBaseStrategy(BaseStrategy):
             if isinstance(self.plugins[i], Clock):
                 self.plugins.pop(i)
                 break
-        self.plugins: Sequence[RLStrategyPlugin] = self.plugins
+        self.plugins: Sequence[RLPlugin] = self.plugins
 
     @property
     def current_experience_steps(self) -> Timestep:

@@ -6,6 +6,7 @@
     importance matrix, which discourages updates to the parameters which are most
     important for a previous task. 
 """
+from avalanche_rl.training.plugins.strategy_plugin import RLPlugin
 from avalanche_rl.training.strategies.buffers import ReplayMemory
 import torch
 from torch.optim import Adam
@@ -16,7 +17,6 @@ from avalanche_rl.benchmarks.generators.rl_benchmark_generators import atari_ben
 from avalanche_rl.training.plugins.ewc import EWCRL
 # from avalanche_rl.logging import TextLogger
 from avalanche_rl.models.dqn import EWCConvDeepQN
-from avalanche.core import BasePlugin
 from avalanche_rl.training.strategies.rl_base_strategy import Timestep
 from avalanche_rl.evaluation.metrics.reward import GenericFloatMetric
 import json
@@ -66,7 +66,7 @@ if __name__ == "__main__":
 
     # a custom plugin to show some functionalities: halve inital epsilon (for eps-greedy action-selection)
     # every two training experiences, so that more exploit is done
-    class HalveEps(BasePlugin):
+    class HalveEps(RLPlugin):
 
         def __init__(self):
             super().__init__()

@@ -14,6 +14,7 @@ class RLStrategyLogger(BaseLogger):
 
     def before_rollout(self, strategy: "BaseStrategy", metric_values: List["MetricValue"], **kwargs):
         for val in metric_values:
+            # TODO
             self.log_metric(val, "before_rollout")
 
     def after_rollout(self, strategy: "BaseStrategy", metric_values: List["MetricValue"], **kwargs):

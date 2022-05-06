@@ -2,8 +2,9 @@ from continual_habitat_lab.utils import suppress_habitat_logging
 suppress_habitat_logging()
 from habitat_sim.logging import logger
 logger.propagate = False
+
+from avalanche_rl.training.plugins.strategy_plugin import RLPlugin
 from avalanche_rl.training.strategies import RLBaseStrategy
-from avalanche.core import BasePlugin
 from gym.core import ObservationWrapper
 from avalanche_rl.models.dqn import ConvDeepQN
 from avalanche_rl.models.actor_critic import ActorCriticMLP, ConvActorCritic
@@ -37,7 +38,7 @@ class HabitatObservations(ObservationWrapper):
         return observation['rgba'][..., :3].transpose(2, 0, 1)
 
 
-class HabitatPlugin(BasePlugin):
+class HabitatPlugin(RLPlugin):
     def __init__(self, max_steps: int = None):
         super().__init__()
         self.max_steps = max_steps
@@ -57,7 +58,7 @@ if __name__ == "__main__":
 
     config = {'tasks': [{'type': 'ObjectNav', 'name': 'Task0'}], 
               'scene': {
-            'scene_path': '/home/nick/datasets/habitat/replicav1/room_2/habitat/mesh_semantic.ply'
+            'scene_path': '../habitat-data/scene_datasets/habitat-test-scenes/skokloster-castle.glb'
         },
         'agent': {
             'sensor_specifications': [{
@@ -84,7 +85,7 @@ if __name__ == "__main__":
     print("Steps per experience", steps_per_exps)
     strategy = A2CStrategy(
         model, optimizer, per_experience_steps=steps_per_exps,
-        max_steps_per_rollout=5, device='cuda:0', eval_every=-1,
+        max_steps_per_rollout=5, device='cpu', eval_every=-1,
         plugins=[HabitatPlugin(max_steps_per_ep)])
 
     # TRAINING LOOP
