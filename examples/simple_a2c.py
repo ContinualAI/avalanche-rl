@@ -1,8 +1,10 @@
+from avalanche_rl.logging.interactive_logging import TqdmWriteInteractiveLogger
 from avalanche_rl.training.strategies import A2CStrategy
 from avalanche_rl.models.actor_critic import ActorCriticMLP
 from torch.optim import Adam
 from avalanche_rl.benchmarks.generators.rl_benchmark_generators import gym_benchmark_generator
 import torch
+from avalanche_rl.training import default_rl_logger
 
 
 if __name__ == "__main__":
@@ -19,9 +21,12 @@ if __name__ == "__main__":
     # A2C learning rate
     optimizer = Adam(model.parameters(), lr=1e-4)
 
+    # configure your logger
+    default_rl_logger.loggers = [TqdmWriteInteractiveLogger(log_every=100)]
+
     strategy = A2CStrategy(
         model, optimizer, per_experience_steps=10000, max_steps_per_rollout=5,
-        device=device, eval_every=1000, eval_episodes=10)
+        device=device, eval_every=1000, eval_episodes=10, evaluator=default_rl_logger)
 
     # TRAINING LOOP
     print('Starting experiment...')
