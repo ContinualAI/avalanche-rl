@@ -2,11 +2,12 @@ from typing import Dict, Tuple
 from torch import Tensor
 from avalanche.training.plugins.ewc import EWCPlugin
 from avalanche.training.utils import copy_params_dict, zerolike_params_dict
+from avalanche_rl.training.plugins.strategy_plugin import RLStrategyPlugin
 from avalanche_rl.training.strategies.buffers import ReplayMemory
 from avalanche_rl.training.strategies import RLBaseStrategy
 
 
-class EWCRL(EWCPlugin):
+class EWCRL(EWCPlugin, RLStrategyPlugin):
     """
     Elastic Weight Consolidation (EWC) plugin for Reinforcement Learning, as presented
     in the original paper "Overcoming catastrophic forgetting in neural networks".
@@ -103,6 +104,9 @@ class EWCRL(EWCPlugin):
         optimizer.zero_grad()
 
         return importances
+
+    def before_rollout(self, *args):
+        pass
 
 
 ParamDict = Dict[str, Tensor]

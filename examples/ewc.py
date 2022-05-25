@@ -9,14 +9,14 @@
 from avalanche_rl.training.strategies.buffers import ReplayMemory
 import torch
 from torch.optim import Adam
-from avalanche_rl.training.plugins.evaluation import EvaluationPlugin
+from avalanche_rl.training.plugins.evaluation import RLEvaluationPlugin
 from avalanche_rl.training.strategies.dqn import DQNStrategy, default_dqn_logger
 from avalanche_rl.training.strategies.env_wrappers import ReducedActionSpaceWrapper
 from avalanche_rl.benchmarks.generators.rl_benchmark_generators import atari_benchmark_generator
 from avalanche_rl.training.plugins.ewc import EWCRL
-from avalanche_rl.logging import TextLogger
+from avalanche_rl.logging import TensorboardLogger
 from avalanche_rl.models.dqn import EWCConvDeepQN
-from avalanche_rl.training.plugins.strategy_plugin import StrategyPlugin
+from avalanche_rl.training.plugins.strategy_plugin import RLStrategyPlugin
 from avalanche_rl.training.strategies.rl_base_strategy import Timestep
 from avalanche_rl.evaluation.metrics.reward import GenericFloatMetric
 import json
@@ -47,17 +47,17 @@ if __name__ == "__main__":
     ewc_plugin = EWCRL(400., memory, mode='separate',
                        start_ewc_after_experience=2)
 
-    # log to file
-    file_logger = TextLogger(open('ewc_log.txt', 'w'))
+    # log to tensorboard
+    tb_logger = TensorboardLogger("/tmp/tb_data")
 
     # keep track of the loss
     ewc_penalty_metric = GenericFloatMetric(
         'loss', 'Ewc Loss', reset_value=0., emit_on=['after_backward'],
         update_on=['before_backward'])
 
-    evaluator = EvaluationPlugin(
+    evaluator = RLEvaluationPlugin(
         *default_dqn_logger.metrics, ewc_penalty_metric,
-        loggers=default_dqn_logger.loggers + [file_logger])
+        loggers=default_dqn_logger.loggers + [tb_logger])
 
     # here we'll have task-specific biases & gains per layer (2 since we're learning 2 games)
     model = EWCConvDeepQN(4, (84, 84), action_space, n_tasks=2, bias=True)
@@ -66,7 +66,7 @@ if __name__ == "__main__":
 
     # a custom plugin to show some functionalities: halve inital epsilon (for eps-greedy action-selection)
     # every two training experiences, so that more exploit is done
-    class HalveEps(StrategyPlugin):
+    class HalveEps(RLStrategyPlugin):
 
         def __init__(self):
             super().__init__()
