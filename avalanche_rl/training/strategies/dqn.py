@@ -100,7 +100,7 @@ class DQNStrategy(RLBaseStrategy):
                               alpha=self.polyak_update_tau,
                               out=target_param.data)
 
-    def before_training_exp(self, **kwargs):
+    def _before_training_exp(self, **kwargs):
         # compute linear decay rate from specified fraction and specified timestep unit 
         # for this experience (supports different number of steps per experience)
         self.eps_decay = (self._init_eps - self.final_eps) / (
@@ -120,7 +120,7 @@ class DQNStrategy(RLBaseStrategy):
 
         # adjust number of rollouts per step in order to assign equal load to each parallel actor
         self.rollouts_per_step = self.rollouts_per_step // self.n_envs
-        return super().before_training_exp()
+        return super()._before_training_exp()
 
     def before_rollout(self, **kwargs):
         # update exploration rate
