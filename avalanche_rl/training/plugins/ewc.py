@@ -1,13 +1,12 @@
-from typing import Dict, Tuple
-from torch import Tensor
 from avalanche.training.plugins.ewc import EWCPlugin
 from avalanche.training.utils import copy_params_dict, zerolike_params_dict
-from avalanche_rl.training.plugins.strategy_plugin import RLStrategyPlugin
 from avalanche_rl.training.strategies.buffers import ReplayMemory
 from avalanche_rl.training.strategies import RLBaseStrategy
+from torch import Tensor
+from typing import Dict, Tuple
 
 
-class EWCRL(EWCPlugin, RLStrategyPlugin):
+class EWCRL(EWCPlugin):
     """
     Elastic Weight Consolidation (EWC) plugin for Reinforcement Learning, as presented
     in the original paper "Overcoming catastrophic forgetting in neural networks".
@@ -25,10 +24,8 @@ class EWCRL(EWCPlugin, RLStrategyPlugin):
                 loss. The larger the lambda, the larger the regularization.
             :param replay_memory: the replay memory to sample from.
             :param batch_size: size of batches sampled during importance computation.
-            :param mode: `separate` to keep a separate penalty for each previous
-                experience.
-                `online` to keep a single penalty summed with a decay factor
-                over all previous tasks.
+            :param mode: `separate` to keep a separate penalty for each previous experience.
+                         `online` to keep a single penalty summed with a decay factor over all previous tasks.
             :param fisher_update_steps: How many times batches are sampled from the ReplayMemory 
                 during computation of the Fisher importance. Defaults to 10.
             :param start_ewc_after_steps: Start computing importances and adding penalty only after this many steps. Defaults to 0.
@@ -64,8 +61,7 @@ class EWCRL(EWCPlugin, RLStrategyPlugin):
         self.saved_params[strategy.training_exp_counter] = copy_params_dict(
             strategy.model)
         # clear previuos parameter values
-        if strategy.training_exp_counter > 0 and \
-                (not self.keep_importance_data):
+        if strategy.training_exp_counter > 0 and (not self.keep_importance_data):
             del self.saved_params[strategy.training_exp_counter - 1]
 
     def before_backward(self, strategy: 'RLBaseStrategy', **kwargs):
@@ -104,10 +100,6 @@ class EWCRL(EWCPlugin, RLStrategyPlugin):
         optimizer.zero_grad()
 
         return importances
-
-    def before_rollout(self, *args):
-        pass
-
 
 ParamDict = Dict[str, Tensor]
 EwcDataType = Tuple[ParamDict, ParamDict]
