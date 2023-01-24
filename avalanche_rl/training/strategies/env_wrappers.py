@@ -8,7 +8,6 @@ from gym.spaces.box import Box
 
 # Env wrappers adapted from pytorch lighting bolts
 
-
 class RGB2GrayWrapper(ObservationWrapper):
     def __init__(self, env):
         super(RGB2GrayWrapper, self).__init__(env)
@@ -26,7 +25,6 @@ class RGB2GrayWrapper(ObservationWrapper):
         # single channel uint8 conversion
         return cv2.cvtColor(obs, cv2.COLOR_RGB2GRAY)
 
-
 class CropObservationWrapper(ObservationWrapper):
     def __init__(self, env, resize_shape=(84, 84)):
         super(CropObservationWrapper, self).__init__(env)
@@ -41,7 +39,6 @@ class CropObservationWrapper(ObservationWrapper):
 
     def observation(self, obs):
         return cv2.resize(obs, self.resize_shape, interpolation=cv2.INTER_AREA)
-
 
 class FrameStackingWrapper(ObservationWrapper):
     """"Wrapper for image stacking"""
@@ -71,7 +68,6 @@ class FrameStackingWrapper(ObservationWrapper):
         # return a copy of current buffer o/w will be referencing same object
         return self.buffer.copy()
 
-
 class Array2Tensor(ObservationWrapper):
     """ Convert observation from numpy array to torch tensors. """
 
@@ -81,7 +77,6 @@ class Array2Tensor(ObservationWrapper):
     def observation(self, observation):
         t = torch.from_numpy(observation).float()
         return t
-
 
 class FireResetWrapper(gym.Wrapper):
     """
@@ -110,7 +105,6 @@ class FireResetWrapper(gym.Wrapper):
         else:
             return super().reset(**kwargs)
 
-
 class ClipRewardWrapper(gym.RewardWrapper):
     """
         Clips reward to {-1, 0, 1} depending on its sign.
@@ -121,7 +115,6 @@ class ClipRewardWrapper(gym.RewardWrapper):
 
     def reward(self, reward: float) -> float:
         return np.sign(reward)
-
 
 class ReducedActionSpaceWrapper(gym.ActionWrapper):
 
@@ -155,7 +148,6 @@ class ReducedActionSpaceWrapper(gym.ActionWrapper):
     def action(self, action):
         # re-map actions
         return self._action_mapping.get(action, action)
-
 
 class VectorizedEnvWrapper(Wrapper):
     """ 

@@ -1,8 +1,7 @@
 import torch
+import numpy as np
 from typing import Union, List
 from dataclasses import dataclass, field
-import numpy as np
-
 
 @dataclass
 class Step:
@@ -57,7 +56,6 @@ class Step:
                 args.append(attr.to(device))
 
         return Step(*args, _post_init=False)
-
 
 @dataclass
 class Rollout:
@@ -211,7 +209,6 @@ class Rollout:
                 attr_tensor = getattr(self, '_'+attr)
                 setattr(rollout, '_'+attr, attr_tensor[idx])
         return rollout
-
 
 @dataclass
 class ReplayMemory:

@@ -1,48 +1,45 @@
-from collections import defaultdict
-from typing import Union, Optional, Sequence, List
 import enum
-from dataclasses import dataclass
 import numpy as np
 import torch
 import torch.nn as nn
-from torch.optim.optimizer import Optimizer
-from gym import Env
-from avalanche.training.strategies.base_strategy import BaseStrategy
-from avalanche_rl.benchmarks.rl_benchmark import RLExperience, RLScenario
-from avalanche_rl.training.plugins.strategy_plugin import RLStrategyPlugin
+from avalanche.training.templates.base import BaseTemplate
+from avalanche.benchmarks.scenarios.rl_scenario import RLExperience
+from avalanche.training.plugins.clock import Clock
+from avalanche.core import BasePlugin
 from avalanche_rl.training.strategies.env_wrappers import *
 from avalanche_rl.training import default_rl_logger
 from avalanche_rl.training.strategies.vectorized_env import VectorizedEnvironment
 from .buffers import Rollout, Step
+from collections import defaultdict
+from typing import Union, Optional, Sequence, List
+from dataclasses import dataclass
+from torch.optim.optimizer import Optimizer
+from gym import Env
 from itertools import count
-from avalanche.training.plugins.clock import Clock
-
 
 class TimestepUnit(enum.IntEnum):
     STEPS = 0
     EPISODES = 1
-
 
 @dataclass
 class Timestep:
     value: int
     unit: TimestepUnit = TimestepUnit.STEPS
 
-
-class RLBaseStrategy(BaseStrategy):
+class RLBaseStrategy(BaseTemplate):
     def __init__(
             self, model: nn.Module, optimizer: Optimizer,
             per_experience_steps: Union[int, Timestep, List[Timestep]],
             criterion=nn.MSELoss(),
             rollouts_per_step: int = 1, max_steps_per_rollout: int = -1,
             updates_per_step: int = 1, device='cpu', max_grad_norm=None,
-            plugins: Sequence[RLStrategyPlugin] = [],
+            plugins: List[BasePlugin] = [],
             discount_factor: float = 0.99, evaluator=default_rl_logger,
             eval_every=-1, eval_episodes: int = 1):
         """
-            RLBaseStrategy specializes BaseStrategy to handle Reinforcement Learning tasks
+            RLBaseStrategy specializes BaseTemplate to handle Reinforcement Learning tasks
             in the continual learning setting and should be subclassed by all RL strategies.
-            It implements a general training loop building on top of the one provided by BaseStrategy,
+            It implements a general training loop building on top of the one provided by BaseTemplate,
             which should be valid for both on and off-policy algorithms, in which at each training
             experience iteration a 'rollout phase' is followed by an 'update'.
             All continual learning scenarios described in the super-class are still supported.
@@ -88,7 +85,7 @@ class RLBaseStrategy(BaseStrategy):
                      unrolling `rollouts_per_step` rollouts of at most `max_steps_per_rollout` length. Defaults to -1.
             :param updates_per_step (int, optional): Number of update steps to perform at each experience step. Defaults to 1.
             :param device: PyTorch device where the model will be allocated.
-            :param plugins: (optional) list of StrategyPlugins.
+            :param plugins: (optional) list of BasePlugins.
             :param discount_factor (float, optional): Also known as \gamma in RL literature, discount factor used 
                     in weighting rewards importance. Defaults to 0.99.
             :param evaluator: (optional) instance of EvaluationPlugin for logging
@@ -103,8 +100,7 @@ class RLBaseStrategy(BaseStrategy):
             :param eval_episodes (int, optional): Number of episodes to run during evaluation. Defaults to 1.
         """
 
-        super().__init__(model, optimizer, criterion=criterion, device=device,
-                         plugins=plugins, eval_every=eval_every, evaluator=evaluator)
+        super().__init__(model, device=device, plugins=plugins)
 
         assert rollouts_per_step > 0 or max_steps_per_rollout > 0, "Must specify at least one terminal condition for rollouts!"
         assert updates_per_step > 0, "Number of updates per step must be positve"
@@ -131,7 +127,11 @@ class RLBaseStrategy(BaseStrategy):
             if isinstance(self.plugins[i], Clock):
                 self.plugins.pop(i)
                 break
-        self.plugins: Sequence[RLStrategyPlugin] = self.plugins
+        
+        self.optimizer = optimizer
+        self.criterion = criterion
+        self.evaluator = evaluator
+        self.eval_every = eval_every
 
     @property
     def current_experience_steps(self) -> Timestep:
@@ -165,8 +165,7 @@ class RLBaseStrategy(BaseStrategy):
         raise NotImplementedError(
             "`sample_rollout_action` must be implemented by every RL strategy")
 
-    def rollout(
-            self, env: Env, n_rollouts: int, max_steps: int = -1) -> List[Rollout]:
+    def rollout(self, env: Env, n_rollouts: int, max_steps: int = -1) -> List[Rollout]:
         """
         Gather experience from Environment leveraging VectorizedEnvironment for parallel interaction and 
         handling auto reset behavior.
@@ -265,9 +264,7 @@ class RLBaseStrategy(BaseStrategy):
         return Array2Tensor(self.environment)
 
     def train(self, experiences: Union[RLExperience, Sequence[RLExperience]],
-              eval_streams: Optional[Sequence[Union[RLExperience,
-                                                    Sequence[
-                                                        RLExperience]]]] = None,
+              eval_streams: Optional[Sequence[Union[RLExperience,Sequence[RLExperience]]]] = None,
               **kwargs):
         self.is_training = True
         self.model.train()
@@ -309,6 +306,7 @@ class RLBaseStrategy(BaseStrategy):
         # Environment creation
         self.environment = self.make_train_env(**kwargs)
 
+        # TODO
         # Model Adaptation (e.g. freeze/add new units)
         # self.model_adaptation()
         self.make_optimizer()
@@ -379,9 +377,7 @@ class RLBaseStrategy(BaseStrategy):
         self.model.train()
 
     @torch.no_grad()
-    def eval(
-            self, exp_list: Union[RLExperience, Sequence[RLExperience]],
-            **kwargs):
+    def eval(self, exp_list: Union[RLExperience, Sequence[RLExperience]], **kwargs):
         """
         Evaluate the current model on a series of experiences and
         returns the last recorded value for each metric.
@@ -447,8 +443,7 @@ class RLBaseStrategy(BaseStrategy):
         self.environment.reset()
         self.environment.close()
 
-    def _model_forward(self, model: nn.Module, observations: torch.Tensor, *
-                       args, **kwargs):
+    def _model_forward(self, model: nn.Module, observations: torch.Tensor, *args, **kwargs):
         """Method for handling forward passage of model handling task label retrieval.
         Args:
             model (nn.Module): Pytorch model to feed observations to.
