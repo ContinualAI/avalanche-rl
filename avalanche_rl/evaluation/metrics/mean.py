@@ -3,7 +3,6 @@ from avalanche.evaluation import Metric
 from typing import List
 import numpy as np
 
-
 class WindowedMovingAverage(Metric[float]):
     def __init__(self, window_size: int):
         assert window_size > 0, "Window size cannot be negative"
