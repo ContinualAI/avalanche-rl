@@ -8,7 +8,7 @@ from .buffers import Rollout, ReplayMemory
 from avalanche.core import BasePlugin
 from avalanche_rl.training import default_rl_logger
 from avalanche_rl.evaluation.metrics.reward import GenericFloatMetric
-from avalanche_rl.training.plugins.evaluation import RLEvaluationPlugin
+from avalanche_rl.training.plugins.rl_plugins import RLEvaluationPlugin
 from avalanche_rl.models.dqn import DQNModel
 from torch.optim.optimizer import Optimizer
 from torch.optim import Optimizer

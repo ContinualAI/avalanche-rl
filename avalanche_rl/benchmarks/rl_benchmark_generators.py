@@ -176,8 +176,7 @@ def atari_benchmark_generator(
         lambda
         env:
         AtariPreprocessing(
-            env=env, scale_obs=normalize_observations,
-            terminal_on_life_loss=terminal_on_life_loss),
+            env=env, terminal_on_life_loss=terminal_on_life_loss),
         FireResetWrapper]
     if clip_reward:
         wrappers.append(ClipRewardWrapper)
