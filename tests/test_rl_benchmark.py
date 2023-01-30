@@ -1,17 +1,12 @@
-from avalanche_rl.benchmarks.rl_benchmark import *
-import unittest
+from avalanche.benchmarks.scenarios.rl_scenario import RLScenario
 import pytest
 import gym
 import numpy as np
 
-# class TestRLBenchmark(unittest.TestCase):
-
-
 @pytest.mark.parametrize('n_envs', [1, 2, 3])
 def test_simple_benchmark_creation(n_envs):
     envs = [gym.make('CartPole-v1') for _ in range(n_envs)]
-    rl_scenario = RLScenario(envs, n_experiences=n_envs,
-                             n_parallel_envs=1, task_labels=True, eval_envs=[])        
+    rl_scenario = RLScenario(envs, n_parallel_envs=1, task_labels=True, eval_envs=[])        
     assert rl_scenario is not None
     assert rl_scenario.n_experiences == n_envs
     tstream = rl_scenario.train_stream
@@ -27,8 +22,7 @@ def test_simple_benchmark_creation(n_envs):
 @pytest.mark.parametrize('n_exps', [3, 7, 10])
 def test_single_env_multiple_experiences(n_exps):
     envs = [gym.make('CartPole-v1')]
-    rl_scenario = RLScenario(envs, n_experiences=n_exps,
-                             n_parallel_envs=1, task_labels=True, eval_envs=[])        
+    rl_scenario = RLScenario(envs, n_parallel_envs=1, task_labels=True, eval_envs=[])        
     assert rl_scenario.n_experiences == n_exps
     tstream = rl_scenario.train_stream
     assert rl_scenario.n_experiences == len(tstream)
