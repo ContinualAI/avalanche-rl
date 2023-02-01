@@ -299,8 +299,7 @@ class RLBaseStrategy(BaseTemplate):
             cpus = min(self.n_envs, multiprocessing.cpu_count())
             env = VectorizedEnvironment(
                 self.environment, self.n_envs, auto_reset=True,
-                wrappers_generators=self.experience.scenario.
-                _wrappers_generators[self.environment.spec.id],
+                wrappers_generators=None,
                 ray_kwargs={'num_cpus': cpus})
         # NOTE: `info['terminal_observation']`` is NOT converted to tensor 
         return Array2Tensor(env)
