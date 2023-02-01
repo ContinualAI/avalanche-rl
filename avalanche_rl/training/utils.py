@@ -21,6 +21,7 @@ from torch.nn import Module, Linear
 from torch.utils.data import Dataset, DataLoader
 from typing import NamedTuple, List, Optional, Tuple, Callable
 
+
 def load_all_dataset(dataset: Dataset, num_workers: int = 0):
     """
     Retrieves the contents of a whole dataset by using a DataLoader
@@ -58,6 +59,7 @@ def load_all_dataset(dataset: Dataset, num_workers: int = 0):
     else:
         return x, y
 
+
 def zerolike_params_dict(model):
     """
     Create a list of (name, parameter), where parameter is initalized to zero.
@@ -68,6 +70,7 @@ def zerolike_params_dict(model):
 
     return [(k, torch.zeros_like(p).to(p.device))
             for k, p in model.named_parameters()]
+
 
 def copy_params_dict(model, copy_grad=False):
     """
@@ -83,11 +86,13 @@ def copy_params_dict(model, copy_grad=False):
     else:
         return [(k, p.data.clone()) for k, p in model.named_parameters()]
 
+
 class LayerAndParameter(NamedTuple):
     layer_name: str
     layer: Module
     parameter_name: str
     parameter: Tensor
+
 
 def get_layers_and_params(model: Module, prefix='') -> List[LayerAndParameter]:
     result: List[LayerAndParameter] = []
@@ -107,11 +112,13 @@ def get_layers_and_params(model: Module, prefix='') -> List[LayerAndParameter]:
 
     return result
 
+
 def get_layer_by_name(model: Module, layer_name: str) -> Optional[Module]:
     for layer_param in get_layers_and_params(model):
         if layer_param.layer_name == layer_name:
             return layer_param.layer
     return None
+
 
 def get_last_fc_layer(model: Module) -> Optional[Tuple[str, Linear]]:
     last_fc = None
@@ -121,9 +128,11 @@ def get_last_fc_layer(model: Module) -> Optional[Tuple[str, Linear]]:
 
     return last_fc
 
+
 def swap_last_fc_layer(model: Module, new_layer: Module) -> None:
     last_fc_name, last_fc_layer = get_last_fc_layer(model)
     setattr(model, last_fc_name, new_layer)
+
 
 def adapt_classification_layer(model: Module, num_classes: int,
                                bias: bool = None) -> Tuple[str, Linear]:
@@ -138,6 +147,7 @@ def adapt_classification_layer(model: Module, num_classes: int,
     new_fc = Linear(last_fc_layer.in_features, num_classes, bias=use_bias)
     swap_last_fc_layer(model, new_fc)
     return last_fc_name, new_fc
+
 
 def replace_bn_with_brn(m: Module, momentum=0.1, r_d_max_inc_step=0.0001,
                         r_max=1.0, d_max=0.0, max_r_max=3.0, max_d_max=5.0):
@@ -165,6 +175,7 @@ def replace_bn_with_brn(m: Module, momentum=0.1, r_d_max_inc_step=0.0001,
         replace_bn_with_brn(ch, momentum, r_d_max_inc_step, r_max, d_max,
                             max_r_max, max_d_max)
 
+
 def change_brn_pars(
         m: Module, momentum=0.1, r_d_max_inc_step=0.0001, r_max=1.0,
         d_max=0.0):
@@ -179,6 +190,7 @@ def change_brn_pars(
     for n, ch in m.named_children():
         change_brn_pars(ch, momentum, r_d_max_inc_step, r_max, d_max)
 
+
 def freeze_everything(model: Module, set_eval_mode: bool = True):
     if set_eval_mode:
         model.eval()
@@ -186,12 +198,14 @@ def freeze_everything(model: Module, set_eval_mode: bool = True):
     for layer_param in get_layers_and_params(model):
         layer_param.parameter.requires_grad = False
 
+
 def unfreeze_everything(model: Module, set_train_mode: bool = True):
     if set_train_mode:
         model.train()
 
     for layer_param in get_layers_and_params(model):
         layer_param.parameter.requires_grad = True
+
 
 def freeze_up_to(model: Module,
                  freeze_until_layer: str = None,
@@ -249,6 +263,7 @@ def freeze_up_to(model: Module,
 
     return frozen_layers, frozen_parameters
 
+
 def examples_per_class(targets):
     result = defaultdict(int)
 
@@ -259,6 +274,7 @@ def examples_per_class(targets):
             int(examples_count[unique_idx])
 
     return result
+
 
 __all__ = [
     'load_all_dataset',

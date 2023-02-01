@@ -10,6 +10,7 @@ from torch.optim import Optimizer
 from torch.distributions import Categorical
 from typing import Union, Optional, Sequence, List
 
+
 class A2CStrategy(RLBaseStrategy):
     def __init__(
             self, model: A2CModel, optimizer: Optimizer,
@@ -22,11 +23,13 @@ class A2CStrategy(RLBaseStrategy):
             policy_loss_weight: float = 0.5,
             value_loss_weight: float = 0.5,
             evaluator=default_rl_logger, **kwargs):
-        # multiple steps per rollout are supported through time dimension flattening
-        # e.g. working with tensors of shape `n_envs`*`timesteps`x`obs_shape`
+        # multiple steps per rollout are supported through time dimension
+        # flattening e.g. working with tensors of shape
+        # `n_envs`*`timesteps`x`obs_shape`
         super().__init__(
             model, optimizer, per_experience_steps=per_experience_steps,
-            # only support max steps as to avoid getting rollouts of different length
+            # only support max steps as to avoid getting rollouts of
+            # different length
             rollouts_per_step=-1,
             max_steps_per_rollout=max_steps_per_rollout,
             device=device, plugins=plugins,
@@ -34,7 +37,8 @@ class A2CStrategy(RLBaseStrategy):
             evaluator=evaluator, **kwargs)
 
         for exp_step in self.per_experience_steps:
-            exp_step.unit == TimestepUnit.STEPS, 'A2C only supports expressing training duration in steps not episodes'
+            exp_step.unit == TimestepUnit.STEPS, 'A2C only supports expressing \
+                training duration in steps not episodes'
 
         self.value_criterion = value_criterion
         self.ac_w = policy_loss_weight
@@ -62,7 +66,8 @@ class A2CStrategy(RLBaseStrategy):
         # perform gradient step(s) over gathered rollouts
         self.loss = 0.
         for rollout in rollouts:
-            # move samples to device for processing and expect tensor of shape `timesteps`x`n_envs`xD`
+            # move samples to device for processing and expect tensor of shape
+            # `timesteps`x`n_envs`xD`
             rollout = rollout.to(self.device)
             # print("Rollout Observation shape", rollout.observations.shape)
             values, policy_logits = self._model_forward(
@@ -79,12 +84,15 @@ class A2CStrategy(RLBaseStrategy):
             # mask terminal states values
             next_values[rollout.dones.view(-1,)] = 0.
 
-            # Actor/Policy Loss Term in A2C: A(s_t, a_t) * grad log (pi(a_t|s_t))
+            # Actor/Policy Loss Term in A2C:
+            # A(s_t, a_t) * grad log (pi(a_t|s_t))
             boostrapped_returns = rollout.rewards + self.gamma * next_values
             advantages = boostrapped_returns - values 
-            # get advantages of taken actions a_t FIXME: this whill need view(-1,1)
+            # get advantages of taken actions a_t
+            # FIXME: this whill need view(-1,1)
             advantages = advantages.gather(dim=1, index=rollout.actions)
-            # print("Rollout adv shape", advantages.shape, log_prob.shape, policy_logits.shape)
+            # print("Rollout adv shape", advantages.shape, log_prob.shape, 
+            #      policy_logits.shape)
             policy_loss = -(advantages * log_prob).mean()
 
             # Value Loss Term: (R_t + gamma * V(S_{t+1}) - V(S_t))^2

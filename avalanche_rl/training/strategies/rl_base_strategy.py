@@ -10,7 +10,8 @@ from avalanche.core import BasePlugin
 from avalanche.models.dynamic_optimizers import reset_optimizer
 from avalanche_rl.training.strategies.env_wrappers import *
 from avalanche_rl.training import default_rl_logger
-from avalanche_rl.training.strategies.vectorized_env import VectorizedEnvironment
+from avalanche_rl.training.strategies.vectorized_env \
+    import VectorizedEnvironment
 from .buffers import Rollout, Step
 from collections import defaultdict
 from typing import Union, Optional, Sequence, List
@@ -19,14 +20,17 @@ from torch.optim.optimizer import Optimizer
 from gym import Env
 from itertools import count
 
+
 class TimestepUnit(enum.IntEnum):
     STEPS = 0
     EPISODES = 1
+
 
 @dataclass
 class Timestep:
     value: int
     unit: TimestepUnit = TimestepUnit.STEPS
+
 
 class RLBaseStrategy(BaseTemplate):
     def __init__(
@@ -39,14 +43,18 @@ class RLBaseStrategy(BaseTemplate):
             discount_factor: float = 0.99, evaluator=default_rl_logger,
             eval_every=-1, eval_episodes: int = 1):
         """
-            RLBaseStrategy specializes BaseTemplate to handle Reinforcement Learning tasks
-            in the continual learning setting and should be subclassed by all RL strategies.
-            It implements a general training loop building on top of the one provided by BaseTemplate,
-            which should be valid for both on and off-policy algorithms, in which at each training
-            experience iteration a 'rollout phase' is followed by an 'update'.
-            All continual learning scenarios described in the super-class are still supported.
-            Additional callbacks have been provided before and after the rollout phase and can be
-            used to further enhance the training loop with additional behavior.
+            RLBaseStrategy specializes BaseTemplate to handle Reinforcement
+            Learning tasks in the continual learning setting and should be
+            subclassed by all RL strategies.
+            It implements a general training loop building on top of the one
+            provided by BaseTemplate, which should be valid for both on and
+            off-policy algorithms, in which at each training experience
+            iteration a 'rollout phase' is followed by an 'update'.
+            All continual learning scenarios described in the super-class
+            are still supported.
+            Additional callbacks have been provided before and after the
+            rollout phase and can be used to further enhance the training loop
+            with additional behavior.
 
             **Training loop**
             The training loop is organized as follows::
@@ -57,7 +65,7 @@ class RLBaseStrategy(BaseTemplate):
                         # for `steps_per_experience` times
                         rollout
                         # for `updates_per_step` times
-                            update, to be defined by sub-strategy (e.g. DQN/A2C..)
+                            update, to be defined by sub-strategy (e.g. DQN/A2C)
                             backward
                             optimizer step
 
@@ -74,38 +82,51 @@ class RLBaseStrategy(BaseTemplate):
         Args:
             :param model: PyTorch model.
             :param optimizer: PyTorch optimizer.
-            :param per_experience_steps (Union[int, Timestep, List[Timestep]]): Number of steps to perform for each experience. 
-                    Steps can either be expressed in terms of number of episodes or actual time steps. 
-                    If a single integer is passed, each experience will be run for the same amount of time steps.
+            :param per_experience_steps (Union[int, Timestep, List[Timestep]]):
+                    Number of steps to perform for each experience. 
+                    Steps can either be expressed in terms of number of
+                    episodes or actual time steps. If a single integer is
+                    passed, each experience will be run for the same amount
+                    of time steps.
             :param criterion: loss function. Defaults to nn.MSELoss().
-            :param rollouts_per_step (int, optional): Number of rollouts to be performed at each step. A rollout is 
-                     to be intended as a sequence of environment interactions which terminate upon reaching the
-                     terminal episode signal (`done=True` in Gym interface). Defaults to 1.
-            :param max_steps_per_rollout (int, optional): Number of rollouts steps to be performed at each step. Note 
-                     that we don't wait for the episode to be done but we advance for a fixed amount of steps, resetting
-                     the environment on terminal signal. If `rollouts_per_step` is also > 0 these parameters are combined,
-                     unrolling `rollouts_per_step` rollouts of at most `max_steps_per_rollout` length. Defaults to -1.
-            :param updates_per_step (int, optional): Number of update steps to perform at each experience step. Defaults to 1.
+            :param rollouts_per_step (int, optional): Number of rollouts to be
+                    performed at each step. A rollout is to be intended as a
+                    sequence of environment interactions which terminate upon
+                    reaching the terminal episode signal
+                    (`done=True` in Gym interface). Defaults to 1.
+            :param max_steps_per_rollout (int, optional): Number of rollouts
+                    steps to be performed at each step. Note that we don't wait
+                    for the episode to be done but we advance for a fixed
+                    amount of steps, resetting the environment on terminal
+                    signal.
+                    If `rollouts_per_step` is also > 0 these parameters are
+                    combined, unrolling `rollouts_per_step` rollouts of at most
+                    `max_steps_per_rollout` length. Defaults to -1.
+            :param updates_per_step (int, optional): Number of update steps to
+                    perform at each experience step. Defaults to 1.
             :param device: PyTorch device where the model will be allocated.
             :param plugins: (optional) list of BasePlugins.
-            :param discount_factor (float, optional): Also known as \gamma in RL literature, discount factor used 
-                    in weighting rewards importance. Defaults to 0.99.
-            :param evaluator: (optional) instance of EvaluationPlugin for logging
-                and metric computations. None to remove logging.
+            :param discount_factor (float, optional): Also known as `gamma` in
+                    RL literature, discount factor used in weighting rewards
+                    importance. Defaults to 0.99.
+            :param evaluator: (optional) instance of EvaluationPlugin for
+                    logging and metric computations. None to remove logging.
             :param eval_every: the frequency of the calls to `eval` inside the
-                training loop.
+                    training loop.
                     if -1: no evaluation during training (Default).
-                    if  0: calls `eval` after the final epoch of each training
+                    if  0: calls `eval` after the final epoch of each training 
                         experience.
-                    if >0: calls `eval` every `eval_every` epochs and at the end
-                        of all the epochs for a single experience.
-            :param eval_episodes (int, optional): Number of episodes to run during evaluation. Defaults to 1.
+                    if >0: calls `eval` every `eval_every` epochs and at the
+                        end of all the epochs for a single experience.
+            :param eval_episodes (int, optional): Number of episodes to run
+                    during evaluation. Defaults to 1.
         """
-
         super().__init__(model, device=device, plugins=plugins)
 
-        assert rollouts_per_step > 0 or max_steps_per_rollout > 0, "Must specify at least one terminal condition for rollouts!"
-        assert updates_per_step > 0, "Number of updates per step must be positve"
+        assert rollouts_per_step > 0 or max_steps_per_rollout > 0, \
+            "Must specify at least one terminal condition for rollouts!"
+        assert updates_per_step > 0, \
+            "Number of updates per step must be positve"
 
         # if a single number is passed, assume it's steps
         if isinstance(per_experience_steps, (int, float)):
@@ -147,7 +168,8 @@ class RLBaseStrategy(BaseTemplate):
     @property
     def current_experience_steps(self) -> Timestep:
         """
-            Return number of steps to perform for current experience (only valid during training).
+            Return number of steps to perform for current experience
+            (only valid during training).
         """
         return self.per_experience_steps[self.experience.current_experience %
                                          len(self.per_experience_steps)]
@@ -162,36 +184,44 @@ class RLBaseStrategy(BaseTemplate):
             p.after_rollout(self, **kwargs)
 
     def sample_rollout_action(self, observations: torch.Tensor) -> np.ndarray:
-        """Implements the action sampling a~Pi(s) where Pi is the parameterized
-           function we're trying to learn.
-           Output of this function should be a numpy array to comply with 
-           `VectorizedEnvironment` interface.
+        """
+        Implements the action sampling a~Pi(s) where Pi is the parameterized
+        function we're trying to learn.
+        Output of this function should be a numpy array to comply with 
+        `VectorizedEnvironment` interface.
 
         Args:
-            observations (torch.Tensor): batch of observations/state at current time t.
+            observations (torch.Tensor): batch of observations/state at current
+                time t.
 
         Returns:
-            np.ndarray: batch of actions to perform during rollout of shape `n_envs` x A.
+            np.ndarray: batch of actions to perform during rollout of shape
+                `n_envs` x A.
         """
         raise NotImplementedError(
             "`sample_rollout_action` must be implemented by every RL strategy")
 
-    def rollout(self, env: Env, n_rollouts: int, max_steps: int = -1) -> List[Rollout]:
+    def rollout(self, env: Env, n_rollouts: int, max_steps: int = -1) \
+            -> List[Rollout]:
         """
-        Gather experience from Environment leveraging VectorizedEnvironment for parallel interaction and 
-        handling auto reset behavior.
+        Gather experience from Environment leveraging VectorizedEnvironment for
+        parallel interaction and handling auto reset behavior.
+        
         Args:
             env (Env): [description]
             n_rollouts (int): [description]
             max_steps (int, optional): [description]. Defaults to -1.
 
         Returns:
-            Tuple[List[Rollout], int]: A list of rollouts, one per episode if `n_rollouts` is defined, where an episode
-            is considered over as soon as one of the actors returns done=True. 
-            Otherwise a single rollout will be returned with the number of steps defined by `max_steps`.
-            A combination of both `n_rollouts` and `max_steps` will result in returning `n_rollouts` episodes of
-            length at most `max_steps`.
-            The number of steps performed is also always returned along with the rollouts.
+            Tuple[List[Rollout], int]: A list of rollouts, one per episode if
+                    `n_rollouts` is defined, where an episode is considered
+                    over as soon as one of the actors returns done=True. 
+                    Otherwise a single rollout will be returned with the number
+                    of steps defined by `max_steps`.
+                    A combination of both `n_rollouts` and `max_steps` will
+                    result in returning `n_rollouts` episodes of length at most
+                    `max_steps`. The number of steps performed is also always
+                    returned along with the rollouts.
         """
         # gather experience from env
         rollout_counter = 0
@@ -206,7 +236,8 @@ class RLBaseStrategy(BaseTemplate):
             self._obs = env.reset()
 
         for t in count(start=1):
-            # sample action(s) from policy moving observation to device; actions of shape `n_envs`xA
+            # sample action(s) from policy moving observation to device;
+            # actions of shape `n_envs`xA
             action = self.sample_rollout_action(
                 self._obs.to(self.device))
 
@@ -231,10 +262,13 @@ class RLBaseStrategy(BaseTemplate):
                     self.rewards['curr_returns'][env_done])
                 self.rewards['curr_returns'][env_done] = 0.
 
-            # Vectorized env auto resets on done by default, check this flag to count episodes
+            # Vectorized env auto resets on done by default,
+            # check this flag to count episodes
             if n_rollouts > 0:
-                # check if any actor has finished an episode or `max_steps` reached
-                if dones.any() or (max_steps > 0 and len(step_experiences) >= max_steps):
+                # check if any actor has finished an episode or
+                # `max_steps` reached
+                if dones.any() or (max_steps > 0 and 
+                                   len(step_experiences) >= max_steps):
                     rollouts.append(
                         Rollout(step_experiences, n_envs=self.n_envs))
                     step_experiences = []
@@ -256,7 +290,8 @@ class RLBaseStrategy(BaseTemplate):
             "`update` must be implemented by every RL strategy")
 
     def make_train_env(self, **kwargs):
-        # maintain vectorized env interface without parallel overhead if `n_envs` is 1
+        # maintain vectorized env interface without parallel overhead
+        # if `n_envs` is 1
         if self.n_envs == 1:
             env = VectorizedEnvWrapper(self.environment, auto_reset=True)
         else:
@@ -275,7 +310,9 @@ class RLBaseStrategy(BaseTemplate):
         return Array2Tensor(self.environment)
 
     def train(self, experiences: Union[RLExperience, Sequence[RLExperience]],
-              eval_streams: Optional[Sequence[Union[RLExperience,Sequence[RLExperience]]]] = None,
+              eval_streams: Optional[Sequence[Union
+                                              [RLExperience, 
+                                               Sequence[RLExperience]]]] = None,
               **kwargs):
         self.is_training = True
         self.model.train()
@@ -324,7 +361,8 @@ class RLBaseStrategy(BaseTemplate):
 
         self._before_training_exp(**kwargs)
 
-        # either run N episodes or steps depending on specified `per_experience_steps`
+        # either run N episodes or steps depending on specified
+        # `per_experience_steps`
         for self.timestep in range(self.current_experience_steps.value):
             self.before_rollout(**kwargs)
             self.rollouts = self.rollout(
@@ -388,7 +426,9 @@ class RLBaseStrategy(BaseTemplate):
         self.model.train()
 
     @torch.no_grad()
-    def eval(self, exp_list: Union[RLExperience, Sequence[RLExperience]], **kwargs):
+    def eval(self,
+             exp_list: Union[RLExperience, Sequence[RLExperience]], 
+             **kwargs):
         """
         Evaluate the current model on a series of experiences and
         returns the last recorded value for each metric.
@@ -396,8 +436,7 @@ class RLBaseStrategy(BaseTemplate):
         :param exp_list: CL experience information.
         :param kwargs: custom arguments.
 
-        :return: dictionary containing last recorded value for
-            each metric name
+        :return: dictionary containing last recorded value for each metric name
         """
         self.is_training = False
         self.model.eval()
@@ -433,12 +472,14 @@ class RLBaseStrategy(BaseTemplate):
             0. for _ in range(self.eval_episodes)]}
         # single env only here
         self.eval_ep_lengths = {0: []}
-        # TODO: evaluate on self.eval_episodes parallel environments at once (evaluate_exp_parallel function)
+        # TODO: evaluate on self.eval_episodes parallel environments at once
+        # (evaluate_exp_parallel function)
         for ep_no in range(self.eval_episodes):
             obs = self.environment.reset()
             for t in count(start=1):
-                # this may get stuck with games such as breakout and deterministic dqn
-                # if we let no op action be selected indefinitely 
+                # TODO: this may get stuck with games such as breakout and
+                # deterministic dqn if we let no op action be selected
+                # indefinitely 
                 action = self.model.get_action(
                     obs.unsqueeze(0).to(self.device),
                     task_label=self.experience.task_label)
@@ -454,11 +495,16 @@ class RLBaseStrategy(BaseTemplate):
         self.environment.reset()
         self.environment.close()
 
-    def _model_forward(self, model: nn.Module, observations: torch.Tensor, *args, **kwargs):
-        """Method for handling forward passage of model handling task label retrieval.
+    def _model_forward(self, model: nn.Module, observations: torch.Tensor,
+                       *args, **kwargs):
+        """
+        Method for handling forward passage of model handling task label
+        retrieval.
+        
         Args:
             model (nn.Module): Pytorch model to feed observations to.
             observations (torch.Tensor): Input to model.
+        
         Returns:
             Model output.
         """

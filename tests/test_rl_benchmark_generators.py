@@ -1,5 +1,6 @@
-from avalanche_rl.benchmarks.rl_benchmark_generators import atari_benchmark_generator, gym_benchmark_generator
 import pytest
+from avalanche_rl.benchmarks.rl_benchmark_generators \
+    import atari_benchmark_generator, gym_benchmark_generator
 
 
 def test_env_creation():
@@ -8,7 +9,9 @@ def test_env_creation():
         n_experiences=1, n_parallel_envs=1, eval_envs=['CartPole-v1'])
     assert len(scenario.train_stream) == 1
     assert len(scenario.test_stream) == 1
-    assert scenario.test_stream[0].environment.spec.id == scenario.train_stream[0].environment.spec.id == 'CartPole-v1'
+    assert scenario.test_stream[0].environment.spec.id == \
+        scenario.train_stream[0].environment.spec.id == \
+        'CartPole-v1'
 
 
 @pytest.mark.parametrize('n_exps', [1, 4, 16])
@@ -19,8 +22,8 @@ def test_task_label(n_exps):
     for exp_no in range(n_exps):
         assert scenario.train_stream[exp_no].task_label == (
             exp_no % scenario._num_original_envs)
-        assert scenario.train_stream[exp_no].environment.spec.id == envs[exp_no % len(
-            envs)] 
+        assert scenario.train_stream[exp_no].environment.spec.id == \
+            envs[exp_no % len(envs)] 
 
     assert len(scenario.test_stream) == 2
     for exp_no in range(min(n_exps, 2)):
@@ -38,8 +41,8 @@ def test_atari_task_label(n_exps):
     for exp_no in range(n_exps):
         assert scenario.train_stream[exp_no].task_label == (
             exp_no % scenario._num_original_envs)
-        assert scenario.train_stream[exp_no].environment.spec.id == envs[exp_no % len(
-            envs)] 
+        assert scenario.train_stream[exp_no].environment.spec.id == \
+            envs[exp_no % len(envs)] 
 
     assert len(scenario.test_stream) == 2
     for exp_no in range(min(n_exps, 2)):

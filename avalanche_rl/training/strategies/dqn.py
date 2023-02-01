@@ -21,11 +21,13 @@ default_dqn_logger = RLEvaluationPlugin(
         emit_on=['after_rollout']),
     loggers=default_rl_logger.loggers)
 
+
 class DQNStrategy(RLBaseStrategy):
     def __init__(
             self, model: DQNModel, optimizer: Optimizer,
             per_experience_steps: Union[int, Timestep, List[Timestep]], 
-            rollouts_per_step: int = -1,  # how often do you perform an update step
+            # rollouts_per_step: how often do you perform an update step
+            rollouts_per_step: int = -1,
             max_steps_per_rollout: int = 8,
             replay_memory_size: int = 10000,
             replay_memory_init_size: int = 5000,
@@ -53,13 +55,18 @@ class DQNStrategy(RLBaseStrategy):
             target_net_update_interval: Timestep = Timestep(
                 target_net_update_interval)
         for exp_step in self.per_experience_steps:
-            assert target_net_update_interval.unit == exp_step.unit, "You must express the target network interval using the same unit as the training lenght"
-        assert initial_epsilon >= final_epsilon, "Initial epsilon value must be greater or equal than final one"
+            assert target_net_update_interval.unit == exp_step.unit, \
+                "You must express the target network interval using the \
+                    same unit as the training lenght"
+        assert initial_epsilon >= final_epsilon, \
+            "Initial epsilon value must be greater or equal than final one"
 
         self.replay_memory: ReplayMemory = initial_replay_memory
         self.replay_init_size = replay_memory_init_size
-        # if replay memory is initialized externally, ignore `replay_memory_size`
-        self.replay_size = replay_memory_size if initial_replay_memory is None else initial_replay_memory.size
+        # if replay memory is already initialized, ignore `replay_memory_size`
+        self.replay_size = replay_memory_size \
+            if initial_replay_memory is None \
+            else initial_replay_memory.size
         self.batch_dim = batch_size
         self.double_dqn = double_dqn
         self.target_net_update_interval: Timestep = target_net_update_interval
@@ -77,8 +84,8 @@ class DQNStrategy(RLBaseStrategy):
 
     def _update_epsilon(self, experience_timestep: int):
         """
-            Linearly decrease exploration rate `self.eps` up to `self.final_eps` in a 
-            fraction of the total timesteps (`exploration_fraction`).
+            Linearly decrease exploration rate `self.eps` up to `self.final_eps`
+            in a fraction of the total timesteps (`exploration_fraction`).
             It will reset to `self._init_eps` on new experience.
         """
         new_value = self._init_eps - experience_timestep * self.eps_decay
@@ -87,7 +94,8 @@ class DQNStrategy(RLBaseStrategy):
     def _update_target_network(self, timestep: int):
         # copy over network parameter to fixed target net
         if timestep > 0 and timestep % self.target_net_update_interval.value:
-            # from stable baseline 3 enhancement https://github.com/DLR-RM/stable-baselines3/issues/93
+            # from stable baseline 3 enhancement
+            # https://github.com/DLR-RM/stable-baselines3/issues/93
             with torch.no_grad():
                 # all done in-place for efficiency
                 for param, target_param in zip(
@@ -99,12 +107,14 @@ class DQNStrategy(RLBaseStrategy):
                               out=target_param.data)
 
     def _before_training_exp(self, **kwargs):
-        # compute linear decay rate from specified fraction and specified timestep unit 
-        # for this experience (supports different number of steps per experience)
+        # compute linear decay rate from specified fraction and specified
+        # timestep unit for this experience (supports different number of
+        # steps per experience)
         self.eps_decay = (self._init_eps - self.final_eps) / (
             self.expl_fr * self.current_experience_steps.value)
 
-        # initialize replay memory with collected data before first experience, taking into account multiple workers
+        # initialize replay memory with collected data before first experience,
+        # taking into account multiple workers
         rollouts = self.rollout(
             self.environment, n_rollouts=-1, max_steps=self.replay_init_size //
             self.n_envs)
@@ -116,7 +126,8 @@ class DQNStrategy(RLBaseStrategy):
 
         self.replay_memory.add_rollouts(rollouts)
 
-        # adjust number of rollouts per step in order to assign equal load to each parallel actor
+        # adjust number of rollouts per step in order to assign equal load to
+        # each parallel actor
         self.rollouts_per_step = self.rollouts_per_step // self.n_envs
         return super()._before_training_exp(**kwargs)
 
@@ -135,13 +146,14 @@ class DQNStrategy(RLBaseStrategy):
 
     def sample_rollout_action(self, observations: torch.Tensor):
         """
-            Generate action following epsilon-greedy strategy in which we either sample
-            a random action with probability epsilon or we exploit current Q-value derived
-            policy by taking the action with greatest Q-value.
+            Generate action following epsilon-greedy strategy in which we
+            either sample a random action with probability epsilon or
+            we exploit current Q-value derived policy by taking the action
+            with greatest Q-value.
 
         Args:
-            observations (torch.Tensor): Observation coming from Env on previous step, 
-            of shape `self.n_envs` x obs_shape.
+            observations (torch.Tensor): Observation coming from Env on
+                previous step, of shape `self.n_envs` x obs_shape.
         """ 
         # all actors interacting with environment either exploit or explore
         if random.random() > self.eps:
@@ -167,14 +179,16 @@ class DQNStrategy(RLBaseStrategy):
 
         if self.double_dqn:
             # Q'(s', argmax_a' Q(s', a') ):
-            # use model to select the action with maximal value (follow greedy policy with current weights)
+            # use model to select the action with maximal value
+            # (follow greedy policy with current weights)
             max_actions = torch.argmax(self._model_forward(
                 self.model, batch.next_observations), dim=1)
             # evaluate q value of that action using fixed target network
             # select max actions, one per batch element
             next_q_values = next_q_values[torch.arange(
                 next_q_values.shape[0]), max_actions]
-            # equal to torch.gather(next_q_values, dim=1, index=max_actions.unsqueeze(-1))
+            # equal to:
+            # torch.gather(next_q_values, dim=1,index=max_actions.unsqueeze(-1))
         else:
             # get values corresponding to highest q value actions
             next_q_values, _ = next_q_values.max(dim=1)
@@ -187,7 +201,8 @@ class DQNStrategy(RLBaseStrategy):
 
         # compute q values prediction for whole batch: Q(s, a)
         q_pred = self._model_forward(self.model, batch.observations)
-        # print('obs shape', batch.observations.shape,'act', batch.actions.shape, 'q pred', q_pred.shape)
+        # print('obs shape', batch.observations.shape, 'act',
+        #       batch.actions.shape, 'q pred', q_pred.shape)
 
         # condition on taken actions (select performed actions' q-values)
         q_pred = torch.gather(
@@ -195,7 +210,8 @@ class DQNStrategy(RLBaseStrategy):
 
         # compute target Q value: Q*(s, a) = R_t + gamma * max_{a'} Q(s', a') 
         next_q_values = self._compute_next_q_values(batch)
-        # print('q next', next_q_values.shape, batch.rewards.shape, batch.dones.shape, 'q pred', q_pred.shape)
+        # print('q next', next_q_values.shape, batch.rewards.shape,
+        #       batch.dones.shape, 'q pred', q_pred.shape)
 
         # mask terminal states only after max q value action has been selected
         q_target = batch.rewards + self.gamma * \

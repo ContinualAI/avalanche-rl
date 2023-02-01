@@ -2,6 +2,7 @@ from avalanche.core import BasePlugin
 from avalanche.training.templates.base import BaseTemplate
 from avalanche.training.plugins.evaluation import EvaluationPlugin
 
+
 class RLStrategyPlugin(BasePlugin):
     """
     Implements RL-specific callbacks.

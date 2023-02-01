@@ -1,11 +1,11 @@
+import torch
 from avalanche_rl.logging.interactive_logging import TqdmWriteInteractiveLogger
 from avalanche_rl.training.strategies import A2CStrategy
 from avalanche_rl.models.actor_critic import ActorCriticMLP
-from torch.optim import Adam
-from avalanche_rl.benchmarks.rl_benchmark_generators import gym_benchmark_generator
-import torch
+from avalanche_rl.benchmarks.rl_benchmark_generators \
+    import gym_benchmark_generator
 from avalanche_rl.training import default_rl_logger
-
+from torch.optim import Adam
 
 if __name__ == "__main__":
     device = torch.device('cpu')
@@ -26,14 +26,16 @@ if __name__ == "__main__":
 
     strategy = A2CStrategy(
         model, optimizer, per_experience_steps=10000, max_steps_per_rollout=5,
-        device=device, eval_every=1000, eval_episodes=10, evaluator=default_rl_logger)
+        device=device, eval_every=1000, eval_episodes=10,
+        evaluator=default_rl_logger)
 
     # TRAINING LOOP
     print('Starting experiment...')
     for experience in scenario.train_stream:
         print("Start of experience ", experience.current_experience)
         print("Current Env ", experience.env)
-        print("Current Task", experience.task_label, type(experience.task_label))
+        print("Current Task", experience.task_label,
+              type(experience.task_label))
         strategy.train(experience, scenario.eval_stream)
 
     print('Training completed')
