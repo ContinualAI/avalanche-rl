@@ -44,13 +44,20 @@ class DQNStrategy(RLBaseStrategy):
             plugins: Optional[Sequence[BasePlugin]] = [],
             reset_replay_on_new_experience: bool = True,
             initial_replay_memory: ReplayMemory = None,
-            evaluator=default_dqn_logger, **kwargs):
+            evaluator=default_dqn_logger,
+            discount_factor = 0.99,
+            eval_every = -1,
+            eval_episodes = 1,
+            max_grad_norm = None,
+            **kwargs):
         super().__init__(
             model, optimizer, per_experience_steps, criterion=criterion,
             rollouts_per_step=rollouts_per_step,
             max_steps_per_rollout=max_steps_per_rollout,
             updates_per_step=updates_per_step, device=device, plugins=plugins,
-            evaluator=evaluator, **kwargs)
+            evaluator=evaluator, discount_factor=discount_factor,
+            eval_every=eval_every, eval_episodes=eval_episodes,
+            max_grad_norm=max_grad_norm, **kwargs)
         if type(target_net_update_interval) is int:
             target_net_update_interval: Timestep = Timestep(
                 target_net_update_interval)
