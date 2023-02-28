@@ -14,13 +14,12 @@ RUN apt-get install git -y
 # RUN chown avalanche-user: /
 # USER avalanche-user
 # COPY --chown=avalanche-user:avalanche-user . /home/avalanche-user/app 
-COPY . /app 
-
-# WORKDIR /home/avalanche-user/app
+# install requirements separately to leverage layer cache
 WORKDIR /app
+COPY requirements.txt .
 RUN python -m venv venv
 # Enable venv
 ENV PATH="/app/venv/bin:$PATH"
-
 RUN pip install -r requirements.txt
+COPY . /app 
 RUN pip install .
