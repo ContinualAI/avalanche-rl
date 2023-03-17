@@ -1,13 +1,12 @@
+import math
+import numpy as np
 from gym.envs.classic_control.cartpole import CartPoleEnv
 from gym.envs.classic_control.mountain_car import MountainCarEnv
 from gym.envs.classic_control.acrobot import AcrobotEnv
-import math
-import numpy as np
 from gym import spaces
 
 
 class ContinualCartPoleEnv(CartPoleEnv):
-
     def __init__(
             self, gravity=9.8, masscart=1.0, masspole=0.1, length=0.5,
             force_mag=10.0, tau=0.02, theta_threshold_radians=12 * 2 * math.pi /
@@ -34,7 +33,6 @@ class ContinualCartPoleEnv(CartPoleEnv):
 
 
 class ContinualMountainCarEnv(MountainCarEnv):
-
     def __init__(self, 
                  goal_velocity=0., 
                  min_position=-1.2,
@@ -67,7 +65,6 @@ class ContinualMountainCarEnv(MountainCarEnv):
 
 
 class ContinualAcrobotEnv(AcrobotEnv):
-
     def __init__(self, 
                  link_length_1=1.,
                  link_length_2=1.,

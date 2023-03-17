@@ -1,16 +1,17 @@
 import pytest
-from avalanche_rl.training.strategies import *
 import torch
-from avalanche.models.simple_mlp import SimpleMLP
-from torch.optim import Adam
 import torch.nn as nn
 import numpy as np
-from avalanche_rl.benchmarks.generators.rl_benchmark_generators import gym_benchmark_generator
+from avalanche_rl.training.strategies import *
+from avalanche.models.simple_mlp import SimpleMLP
+from avalanche_rl.benchmarks.rl_benchmark_generators \
+    import gym_benchmark_generator
+from torch.optim import Adam
 
 
-# for testing purposes implement all methods needed to have a working RL Strategy
+# for testing purposes implement all methods needed to have 
+# a working RL Strategy
 class RandomTestStrategy(RLBaseStrategy):
-
     def __init__(
             self, model, optimizer, per_experience_steps,
             rollouts_per_step: int, max_steps_per_rollout: int,

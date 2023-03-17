@@ -5,7 +5,6 @@ from avalanche.models.simple_mlp import SimpleMLP
 
 
 class DQNModel(nn.Module):
-
     def __init__(self):
         super().__init__()
 
@@ -22,7 +21,6 @@ class MLPDeepQN(DQNModel):
     """
     Simple Action-Value MLP for DQN.
     """
-
     def __init__(
             self, input_size: int, hidden_size: int, n_actions: int,
             hidden_layers: int = 1):
@@ -37,8 +35,10 @@ class MLPDeepQN(DQNModel):
 
 
 class ConvDeepQN(DQNModel):
-    # network architecture from Mnih et al 2015 - "Human-level Control Through Deep Reinforcement Learning"
-    def __init__(self, input_channels, image_shape, n_actions, batch_norm=False):
+    # network architecture from Mnih et al 2015 
+    # "Human-level Control Through Deep Reinforcement Learning"
+    def __init__(self, input_channels, image_shape, n_actions,
+                 batch_norm=False):
         super(ConvDeepQN, self).__init__()
         # 4x84x84 input in original paper
         self.conv1 = nn.Conv2d(input_channels, 32, 8, stride=4)
@@ -70,16 +70,18 @@ class ConvDeepQN(DQNModel):
             x = self.conv1(x)
             x = self.conv2(x)
             x = self.conv3(x)
-        print("Size of flattened input to fully connected layer:", x.flatten().shape)
+        print("Size of flattened input to fully connected layer:",
+              x.flatten().shape)
         return x.squeeze(0).flatten().shape[0]
 
 
 class EWCConvDeepQN(DQNModel):
     """Model used in the original EWC paper https://arxiv.org/abs/1612.00796.
-        It is a variant of the original DQN with added task-specific biases and gains. 
+        It is a variant of the original DQN with added task-specific biases
+        and gains. 
     """
-
-    def __init__(self, input_channels, image_shape, n_actions, n_tasks, bias=False):
+    def __init__(self, input_channels, image_shape, n_actions, n_tasks,
+                 bias=False):
         super().__init__()
 
         self.conv1 = nn.Conv2d(input_channels, 32, 8, stride=4, bias=bias)

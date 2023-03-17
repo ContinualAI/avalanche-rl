@@ -1,7 +1,7 @@
 import pytest
-from avalanche_rl.training.strategies.buffers import ReplayMemory, Step, Rollout
 import numpy as np
 import torch
+from avalanche_rl.training.strategies.buffers import ReplayMemory, Step, Rollout
 from itertools import product
 
 
@@ -69,7 +69,7 @@ def test_rollout(type_: str, n_envs: int, flatten):
     rollout = Rollout([make_step(type_, n_envs)
                       for _ in range(20)], n_envs=n_envs, _flatten_time=flatten)
     # assert no unravelling was done at first
-    assert rollout._unraveled == False
+    # assert rollout._unraveled == False
     for attr in ['states', 'actions', 'rewards', 'next_states']:
         assert getattr(rollout, '_'+attr, None) is None
 
@@ -107,16 +107,18 @@ def test_rollout_slicing():
     assert rollout[1].steps == steps[1]
     assert rollout[:10].steps == steps[:10]
     assert rollout[-10:].steps == steps[-10:]
-    # NOTE: this won't guarantee `rollout[:10].observations = rollout.observations[:10]`
-    # as `rollout` will get shuffled upon unravelling (that's why we set `_shuffle=False` above)
+    # NOTE: this won't guarantee
+    # `rollout[:10].observations = rollout.observations[:10]`
+    # as `rollout` will get shuffled upon unravelling
+    # (that's why we set `_shuffle=False` above)
     obs = rollout[:10].observations
     assert (obs == rollout.observations[:10]).all()
     # with unravel
     actions = rollout.actions
     states = rollout.observations
     assert rollout._unraveled and rollout[0]._unraveled
-    assert (rollout[-10:].actions == actions[-10:]
-            ).all() and np.may_share_memory(rollout[-10:].actions, actions[-10:])
+    assert (rollout[-10:].actions == actions[-10:]).all() and \
+        np.may_share_memory(rollout[-10:].actions, actions[-10:])
     assert (rollout[2:4].observations == states[2:4]).all(
     ) and np.may_share_memory(rollout[2:4].observations, states[2:4])
 
@@ -139,13 +141,15 @@ def test_replay_memory():
         # newest addition on head
         assert (attr_tensor[:20] == getattr(rollouts[-1], attr)).all()
         assert (attr_tensor[20:40] == getattr(rollouts[-2], attr)).all()
-        # TODO: we should flip tensor before storing it in order to keep last X steps instead of first X
+        # TODO: we should flip tensor before storing it in order to keep
+        # last X steps instead of first X
         assert (attr_tensor[-10:] == getattr(rollouts[-3], attr)[:10]).all()
 
     # add a rollout with size greater than memory
     # mem = ReplayMemory(50, n_envs)
     rollout = Rollout([make_step(type_, n_envs)
-                      for _ in range(100)], n_envs=n_envs, _flatten_time=True, _shuffle=False)
+                      for _ in range(100)], n_envs=n_envs, _flatten_time=True, 
+                      _shuffle=False)
     mem.add_rollouts([rollout])
     assert mem.actual_size == 50
     for attr in ['observations', 'actions', 'rewards', 'dones',

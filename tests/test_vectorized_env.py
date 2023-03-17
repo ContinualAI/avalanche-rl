@@ -1,18 +1,19 @@
-from gym.wrappers.atari_preprocessing import AtariPreprocessing
 import pytest
 import gym
-from avalanche_rl.training.strategies.vectorized_env import VectorizedEnvironment
 import numpy as np
 import ray
-from avalanche_rl.training.strategies.env_wrappers import Array2Tensor, FrameStackingWrapper, RGB2GrayWrapper, CropObservationWrapper
 import torch
-from gym import Env
 import gym.spaces
+from avalanche_rl.training.strategies.vectorized_env \
+    import VectorizedEnvironment
+from avalanche_rl.training.strategies.env_wrappers import \
+    Array2Tensor, FrameStackingWrapper, RGB2GrayWrapper, CropObservationWrapper
 from avalanche_rl.training.strategies.buffers import Step, Rollout
+from gym import Env
+from gym.wrappers.atari_preprocessing import AtariPreprocessing
 
 
 class CustomTestEnv(Env):
-
     def __init__(self):
         self.observation_space = gym.spaces.Discrete(1)
         self.action_space = gym.spaces.Discrete(10)
@@ -54,7 +55,8 @@ def test_single_env_single_cpu_reset():
     assert isinstance(obs, np.ndarray)
     # 4 is CartPole obs space size
     assert obs.shape == (1, 4)
-    # if on mac os, make sure you install pip install pyglet==1.5.11. won't work on servers
+    # if on mac os, make sure you install pip install pyglet==1.5.11.
+    # Won't work on servers
     # obs = env.render(mode='rgb_array')
     # assert isinstance(obs, np.ndarray)
     # assert obs.shape[0] == 1 and obs.shape[-1] == 3
@@ -115,14 +117,17 @@ def test_env_wrapping():
         env = gym.make('Pong-v4')
     except Exception as e:
         pytest.skip(
-            "Install `pip install gym[atari]` to run this test + download atari ROMs as explained here https://github.com/openai/atari-py#roms.")
+            "Install `pip install gym[atari]` to run this test + download \
+                atari ROMs as explained here \
+                https://github.com/openai/atari-py#roms.")
     env = RGB2GrayWrapper(env)
     env = CropObservationWrapper(env, resize_shape=(84, 84))
 
     # wrap each actor environment to reduce array shape before gathering results 
     venv = VectorizedEnvironment(env, 2, auto_reset=False, wrappers_generators=[
                                  RGB2GrayWrapper, CropObservationWrapper])
-    # can be wrapped like any env as long as extra `n_envs` dimension is taken into consideration 
+    # can be wrapped like any env as long as extra `n_envs` dimension
+    # is taken into consideration 
     venv = Array2Tensor(venv)
 
     vobs = venv.reset()
@@ -148,12 +153,15 @@ def test_env_different():
         env = gym.make('PongDeterministic-v4')
     except Exception as e:
         pytest.skip(
-            "Install `pip install gym[atari]` to run this test + download atari ROMs as explained here https://github.com/openai/atari-py#roms.")
+            "Install `pip install gym[atari]` to run this test + download \
+                atari ROMs as explained here \
+                https://github.com/openai/atari-py#roms.")
     env = VectorizedEnvironment(env, 3, auto_reset=True)
     # init observation is always the same
     env.reset()
     for _ in range(10):
-        # pong actions ['NOOP', 'FIRE', 'RIGHT', 'LEFT', 'RIGHTFIRE', 'LEFTFIRE']
+        # pong actions:
+        # ['NOOP', 'FIRE', 'RIGHT', 'LEFT', 'RIGHTFIRE', 'LEFTFIRE']
         actions = np.array([0, 2, 3], dtype=np.int32).reshape(3, 1)
         obs, _, done, info = env.step(actions)
         for i in range(obs.shape[0]-1):
@@ -168,7 +176,9 @@ def test_atari_wrapped():
         env = gym.make('PongNoFrameskip-v4')
     except Exception as e:
         pytest.skip(
-            "Install `pip install gym[atari]` to run this test + download atari ROMs as explained here https://github.com/openai/atari-py#roms.")
+            "Install `pip install gym[atari]` to run this test + download \
+                atari ROMs as explained here \
+                https://github.com/openai/atari-py#roms.")
     wrappers = [AtariPreprocessing, FrameStackingWrapper]
     env = VectorizedEnvironment(
         env, 3, auto_reset=True, wrappers_generators=wrappers)
@@ -193,14 +203,16 @@ def test_atari_wrapped():
     # first frame we don't move (?)
     env.step(np.asarray([0, 2, 3]))
     for i in range(5):
-        # pong actions ['NOOP', 'FIRE', 'RIGHT', 'LEFT', 'RIGHTFIRE', 'LEFTFIRE']
+        # pong actions:
+        # ['NOOP', 'FIRE', 'RIGHT', 'LEFT', 'RIGHTFIRE', 'LEFTFIRE']
         actions = np.array([0, 2, 3], dtype=np.int32)
         for _ in range(3):
             obs, _, done, info = env.step(actions)
         obs = obs.float()
         # check observations are different
-        assert torch.sum(obs[0] - obs[1]).item() != 0 and torch.sum(obs[0] -
-                                                                    obs[2]).item() != 0 and torch.sum(obs[1] - obs[2]).item() != 0
+        assert torch.sum(obs[0] - obs[1]).item() != 0 and \
+            torch.sum(obs[0] - obs[2]).item() != 0 and \
+            torch.sum(obs[1] - obs[2]).item() != 0
 
     env.close()
 

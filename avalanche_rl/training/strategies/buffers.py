@@ -1,7 +1,7 @@
 import torch
-from typing import Union, List
-from dataclasses import dataclass, field
 import numpy as np
+from typing import Union, List
+from dataclasses import dataclass
 
 
 @dataclass
@@ -39,10 +39,12 @@ class Step:
         return self.states.shape[0] 
 
     def __getitem__(self, actor_idx: int):
-        """ Slice an actor step over the n_envs dimension by returning i-th array of each attribute. """
+        """ Slice an actor step over the n_envs dimension by returning i-th
+        array of each attribute. """
         if actor_idx >= self.n_envs:
             raise IndexError(
-                f'indx {actor_idx} is out of bound for axis with size {self.n_envs} (number of parallel envs).')
+                f'indx {actor_idx} is out of bound for axis with size \
+                    {self.n_envs} (number of parallel envs).')
         return tuple(getattr(self, k)[actor_idx, ...]
                      for k in self.__annotations__ if k != '_post_init')
 
@@ -67,15 +69,17 @@ class Rollout:
     _unraveled: bool = False
     """ Whether to shuffle steps contained in this rollout. """
     _shuffle: bool = True
-    """ Whether to flatten time dimension returning `n_envs`*`len(steps)`xD tensors. """
+    """ Whether to flatten time dimension returning
+        `n_envs`*`len(steps)`xD tensors. """
     _flatten_time: bool = True
 
     def _pre_compute_unraveled_steps(self):
-        """Computes and stores values for `obs`, `rewards`, `dones`, `next_obs` unraveled
-           (e.g. of shape `n_env` x `len(steps)` x D) or flattened 
-           (e.g. of shape `n_env` * `len(steps)` x D) through time .
-           This is only done during the update of the policy network (when needed) 
-           to save memory specifically for the case of ReplayMemory.
+        """Computes and stores values for `obs`, `rewards`, `dones`, `next_obs`
+            unraveled (e.g. of shape `n_env` x `len(steps)` x D) or
+            flattened (e.g. of shape `n_env` * `len(steps)` x D) through time.
+           This is only done during the update of the policy network
+           (when needed) to save memory specifically for the case of
+           ReplayMemory.
         """
         if not len(self.steps):
             return False
@@ -129,7 +133,8 @@ class Rollout:
 
                 setattr(self, '_'+attr, attr_tensor)
                 # squeeze timestep dimension if a single step is present
-                # print(attr, 'tensor shape', attr_tensor.shape, attr_tensor.dtype)
+                # print(attr, 'tensor shape', attr_tensor.shape,
+                #      attr_tensor.dtype)
                 # if len(self.steps) == 1:
                 # TODO: this doesnt really make a difference for networks
                 # setattr(self, '_'+attr, attr_tensor.squeeze(0))
@@ -178,13 +183,15 @@ class Rollout:
     @property
     def next_observations(self):
         """
-            Returns all 'next step' observations gathered at each step of this rollout.
+            Returns all 'next step' observations gathered at each step of this
+            rollout.
         """
         return self._get_value('next_states')
 
     def to(self, device: torch.device):
         """
-            Should only do this before processing to avoid filling gpu with replay memory.
+            Should only do this before processing to avoid filling gpu with
+            replay memory.
         """
         if not self._unraveled:
             self._unraveled = self._pre_compute_unraveled_steps()
@@ -197,9 +204,12 @@ class Rollout:
         return len(self.steps)
 
     def __getitem__(self, idx):
-        # NOTE: this won't guarantee `rollout[:10].observations = self.observations[:10]`
-        # if shuffle is set and unravelling hasn't been done yet, as the current rollout
-        # will get shuffled. Nonetheless, unravelling a sliced rollout can be faster so we keep this behavior.
+        # NOTE: this won't guarantee
+        # `rollout[:10].observations = self.observations[:10]`
+        # if shuffle is set and unravelling hasn't been done yet,
+        # as the current rollout will get shuffled.
+        # Nonetheless, unravelling a sliced rollout can be faster so
+        # we keep this behavior.
         rollout = Rollout(
             self.steps[idx],
             self.n_envs, self._device, _unraveled=self._unraveled,
@@ -216,7 +226,10 @@ class Rollout:
 @dataclass
 class ReplayMemory:
     # like a Rollout but with time-indipendent Steps 
-    """ Max number of Steps contained inside memory. When trying to add a new Step and size is reached, a previous Step is replaced. """
+    """ Max number of Steps contained inside memory.
+        When trying to add a new Step and size is reached,
+        a previous Step is replaced.
+    """
     size: int
     n_envs: int
 
@@ -233,7 +246,8 @@ class ReplayMemory:
 
     def _init_buffers(self, rollout: Rollout):
         """Initialize buffers using first rollout info"""
-        assert rollout._flatten_time, "ReplayMemory expects tensors of shape `(n_envs*t) x D`, `flatten_time` flag must be set in rollout!"
+        assert rollout._flatten_time, "ReplayMemory expects tensors of shape \
+            `(n_envs*t) x D`, `flatten_time` flag must be set in rollout!"
 
         for attr in self._attrs:
             # expect tensor of shape `(n_envs*t) x D`; also maintain dtype
@@ -247,8 +261,8 @@ class ReplayMemory:
 
     # def _unravel_step(self, step: Step):
     #     """
-    #         Slice through provided step on `n_envs` dimension returning `n_envs`
-    #         separated Steps. 
+    #         Slice through provided step on `n_envs` dimension returning
+    #         `n_envs` separated Steps. 
     #     """
     #     # support even envs not using VectorizedEnv interface
     #     if self.n_envs < 0:
@@ -259,7 +273,9 @@ class ReplayMemory:
     #             yield Step(*step[actor_no], _post_init=False)
 
     def _add_rollout(self, rollout: Rollout):
-        """Implements "push to memory" operation simulating a circular buffer with `torch.roll`."""
+        """Implements "push to memory" operation simulating a circular buffer
+            with `torch.roll`.
+        """
         # assuming t*nxD form
         n_steps = len(rollout) * rollout.n_envs
         # if trying to push a rollout greater than replay mem size, 
@@ -269,7 +285,8 @@ class ReplayMemory:
             n_steps = self.size
 
         self.actual_size = min(self.actual_size+n_steps, self.size)
-        # circular buffer strategy, put remaining element at the start and replace old ones
+        # circular buffer strategy, put remaining element at the start
+        # and replace old ones
         # do this for each rollout 'component'
         for attr in self._attrs:
             # get reference to tensor object
@@ -280,14 +297,16 @@ class ReplayMemory:
 
     def add_rollouts(self, rollouts: List[Rollout]):
         """
-            Adds a list of rollouts to the memory disentangling steps coming from
-            parallel environments/actors so that we can sample more efficiently from 
-            a simple list of steps and handle replacing of new experience.
+            Adds a list of rollouts to the memory disentangling steps coming
+            from parallel environments/actors so that we can sample more
+            efficiently from a simple list of steps and handle replacing of
+            new experience.
 
         Args:
             rollouts (List[Rollout]): [description]
         """
-        # increase sample counter counting data from different actors as separate samples
+        # increase sample counter counting data from different actors
+        # as separate samples
         if not self._initialized:
             self._init_buffers(rollouts[0])
 
@@ -296,10 +315,11 @@ class ReplayMemory:
 
     def sample_batch(self, batch_dim: int, device: torch.device) -> Rollout:
         """
-            Sample a batch of random Steps, returned as a Rollout with time independent Steps
-            and no `n_envs` dimension (therefore of shape `batch_dim` x D). 
-            Batch is also moved to device just before processing so that we don't risk
-            filling GPU with replay memory samples.
+            Sample a batch of random Steps, returned as a Rollout with time
+            independent Steps and no `n_envs` dimension
+            (therefore of shape `batch_dim` x D). 
+            Batch is also moved to device just before processing so that we
+            don't risk filling GPU with replay memory samples.
 
         Args:
             batch_dim (int): [description]
