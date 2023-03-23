@@ -15,12 +15,12 @@
 It should support all environments sharing the `gym.Env` interface, handle stream of experiences, provide strategies for RL algorithms and enable fast prototyping through an extremely flexible and customizable API. 
 
 The core structure and design principles of Avalanche are to remain untouched to easen the learning curve for all continual learning practitioners, so we still work with the same modules you can find in avl:
-- [Benchmarks](avalanche/benchmarks) for managing data and stream of data.
-- [Training](avalanche/training) for model training making use of extensible strategies.
-- [Evaluation](avalanche/evaluation) to evaluate the agent on consistent metrics.
-- [Extras](avalanche/extras) for general utils and building blocks.
-- [Models](avalanche/models) contains commonly used model architectures.
-- [Logging](avalanche/logging) for logging metrics during training/evaluation.
+- [Benchmarks](avalanche_rl/benchmarks) for managing data and stream of data.
+- [Training](avalanche_rl/training) for model training making use of extensible strategies.
+- [Evaluation](avalanche_rl/evaluation) to evaluate the agent on consistent metrics.
+- [Extras](avalanche_rl/extras) for general utils and building blocks.
+- [Models](avalanche_rl/models) contains commonly used model architectures.
+- [Logging](avalanche_rl/logging) for logging metrics during training/evaluation.
 
 Head over to [Avalanche Website](https://avalanche.continualai.org) to learn more if these concepts sound unfamiliar to you!
 
