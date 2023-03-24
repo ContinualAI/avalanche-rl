@@ -20,7 +20,7 @@ class WindowedMovingAverage(Metric[float]):
 
     def result(self) -> float:
         if not len(self.window):
-            return np.float("-inf")
+            return np.float64("-inf")
         return sum(self.window) / len(self.window)
 
     def reset(self):
