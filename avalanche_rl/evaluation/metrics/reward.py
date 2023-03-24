@@ -26,9 +26,9 @@ class MovingWindowedStat(RLPluginMetric[float]):
         if self._stat == 'mean':
             return self._moving_window.result()
         if self._stat == 'max':
-            return np.amax(self._moving_window.window, initial=np.float('-inf'))
+            return np.amax(self._moving_window.window, initial=np.float64('-inf'))
         if self._stat == 'min':
-            return np.amin(self._moving_window.window, initial=np.float('-inf'))
+            return np.amin(self._moving_window.window, initial=np.float64('-inf'))
         if self._stat == 'std':
             if len(self._moving_window.window):
                 return np.std(self._moving_window.window)
@@ -46,8 +46,9 @@ class MovingWindowedStat(RLPluginMetric[float]):
         # you must emit at every timestep or you can't figure out experience
         # lenght when gathering with `get_all_metrics`, that's not great
         values = self.result()
+        metric = [MetricValue(self, str(self), values, self.x_coord)]
         self.x_coord += 1
-        return [MetricValue(self, str(self), values, self.x_coord)]
+        return metric
 
     def reset(self) -> None:
         """
@@ -56,10 +57,12 @@ class MovingWindowedStat(RLPluginMetric[float]):
         self._moving_window.reset()
 
     def __str__(self) -> str:
-        def camelcase(s: str):
-            return s[0].upper() + s[1:].lower()
-        return f'[{camelcase(self._mode)}] {camelcase(self._stat)} {self.name} \
-                (last {self.window_size} steps)'
+        # def camelcase(s: str):
+        #     return s[0].upper() + s[1:].lower()
+        # return f'[{camelcase(self._mode)}] {camelcase(self._stat)} {self.name} \
+        #     (last {self.window_size} steps)'
+        return f"{self._mode}/" + \
+            "-".join([self.name, self._stat, str(self.window_size)])
 
 
 def moving_window_stat(
@@ -77,7 +80,7 @@ def moving_window_stat(
             metrics += list(map(lambda s: ReturnPluginMetric(window_size, s,
                                                              mode=m), stats))
         elif metric == 'ep_length':
-            metrics += list(map(lambda s: EpLenghtPluginMetric(window_size, s,
+            metrics += list(map(lambda s: EpLengthPluginMetric(window_size, s,
                                                                mode=m), stats))
     return metrics
 
@@ -89,7 +92,7 @@ class ReturnPluginMetric(MovingWindowedStat):
         Keep track of sum of rewards (returns) per episode.
     """
     def __init__(
-            self, window_size: int, stat: str = 'mean', name: str = 'Reward',
+            self, window_size: int, stat: str = 'mean', name: str = 'reward',
             mode: str = 'train'):
         super().__init__(window_size, stat=stat, name=name, mode=mode)
         self._last_returns_len = 0
@@ -136,9 +139,9 @@ class ReturnPluginMetric(MovingWindowedStat):
             return self.emit()
 
 
-class EpLenghtPluginMetric(MovingWindowedStat):
+class EpLengthPluginMetric(MovingWindowedStat):
     def __init__(self, window_size: int, stat: str = 'mean',
-                 name: str = 'Episode Length', mode='train'):
+                 name: str = 'episodelength', mode='train'):
         super().__init__(window_size, stat=stat, name=name, mode=mode)
         self._actor_ep_lengths = defaultdict(lambda: 0)
 
@@ -238,8 +241,9 @@ class GenericFloatMetric(RLPluginMetric[float]):
         """
         Emit the result
         """
+        metric = [MetricValue(self, str(self), self.metric_value, self.x_coord)]
         self.x_coord += 1
-        return [MetricValue(self, str(self), self.metric_value, self.x_coord)]
+        return metric
 
     def __str__(self):
         return self.name
