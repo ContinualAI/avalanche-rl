@@ -7,14 +7,7 @@ on:
     paths:
       - '**.py'
       - '.github/workflows/test-coverage-coveralls.yml'
-      - 'environment.yml'
-  pull_request:
-    branches:
-      - master
-    paths:
-      - '**.py'
-      - '.github/workflows/test-coverage-coveralls.yml'
-      - 'environment.yml'
+      - 'requirements.txt'
 
 jobs:
   build-and-push:
@@ -38,6 +31,7 @@ jobs:
   unit-test:
     if: github.repository == 'ContinualAI/avalanche-rl'
     name: unit test
+    needs: build-and-push
     runs-on: ubuntu-latest
     container:
       image: nicklucche/avalanche-rl:latest
@@ -45,7 +39,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: [ "3.6", "3.7", "3.8", "3.9"]
+        python-version: ["3.7", "3.8", "3.9"]
     defaults:
       run:
         shell: bash -l {0}
