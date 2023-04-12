@@ -114,7 +114,7 @@ class VectorizedEnvironment(object):
                               List[gym.Env], gym.Env],
             n_envs: int, env_kwargs=dict(), auto_reset: bool = True,
             wrappers_generators: List[Callable[[Any], Wrapper]] = None,
-            ray_kwargs={'num_cpus': multiprocessing.cpu_count()}
+            ray_kwargs={'num_cpus': multiprocessing.cpu_count(), 'num_gpus': 0}
             ) -> None:
         # Avoid passing over potentially big objects on the network, prefer
         # creating env locally to each actor
