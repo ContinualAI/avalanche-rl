@@ -7,7 +7,7 @@ can be easily combined with your own strategy.
 """
 from avalanche_rl.evaluation.metrics.reward import moving_window_stat
 from avalanche_rl.logging.interactive_logging import TqdmWriteInteractiveLogger
-from avalanche_rl.training.plugins.evaluation import RLEvaluationPlugin
+from avalanche_rl.training.plugins.rl_plugins import RLEvaluationPlugin
 from typing import List
 
 default_rl_logger = RLEvaluationPlugin(
