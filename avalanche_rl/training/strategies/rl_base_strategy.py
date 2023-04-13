@@ -8,6 +8,7 @@ from avalanche.training.plugins.clock import Clock
 from avalanche.training.plugins.evaluation import EvaluationPlugin
 from avalanche.core import BasePlugin
 from avalanche.models.dynamic_optimizers import reset_optimizer
+from avalanche.training.utils import trigger_plugins
 from avalanche_rl.training.strategies.env_wrappers import *
 from avalanche_rl.training import default_rl_logger
 from avalanche_rl.training.strategies.vectorized_env \
@@ -363,6 +364,7 @@ class RLBaseStrategy(BaseTemplate):
         # either run N episodes or steps depending on specified
         # `per_experience_steps`
         for self.timestep in range(self.current_experience_steps.value):
+            self._before_training_iteration(**kwargs)
             self.before_rollout(**kwargs)
             self.rollouts = self.rollout(
                 env=self.environment, n_rollouts=self.rollouts_per_step,
@@ -375,9 +377,9 @@ class RLBaseStrategy(BaseTemplate):
 
                 # Backward
                 self.optimizer.zero_grad()
-                # self._before_backward(**kwargs)
+                self._before_backward(**kwargs)
                 self.loss.backward()
-                # self._after_backward(**kwargs)
+                self._after_backward(**kwargs)
 
                 # Gradient norm clipping
                 if self.max_grad_norm is not None:
@@ -386,9 +388,9 @@ class RLBaseStrategy(BaseTemplate):
                         self.max_grad_norm)
 
                 # Optimization step
-                # self._before_update(**kwargs)
+                self._before_update(**kwargs)
                 self.optimizer.step()
-                # self._after_update(**kwargs)
+                self._after_update(**kwargs)
 
             self._after_training_iteration(**kwargs)
             # periodic evaluation
@@ -443,7 +445,7 @@ class RLBaseStrategy(BaseTemplate):
         if isinstance(exp_list, RLExperience):
             exp_list: List[RLExperience] = [exp_list]
 
-        self._before_eval(*kwargs)
+        self._before_eval(**kwargs)
         for self.experience in exp_list:
             self.environment = self.experience.environment
             # only single env supported during evaluation
@@ -465,7 +467,7 @@ class RLBaseStrategy(BaseTemplate):
 
         return res
 
-    def evaluate_exp(self):
+    def evaluate_exp(self, **kwargs):
         # rewards per episode
         self.eval_rewards = {'past_returns': [
             0. for _ in range(self.eval_episodes)]}
@@ -474,20 +476,24 @@ class RLBaseStrategy(BaseTemplate):
         # TODO: evaluate on self.eval_episodes parallel environments at once
         # (evaluate_exp_parallel function)
         for ep_no in range(self.eval_episodes):
+            self._before_eval_iteration(**kwargs)
             obs = self.environment.reset()
             for t in count(start=1):
                 # TODO: this may get stuck with games such as breakout and
                 # deterministic dqn if we let no op action be selected
-                # indefinitely 
+                # indefinitely
+                self._before_eval_forward(**kwargs) 
                 action = self.model.get_action(
                     obs.unsqueeze(0).to(self.device),
                     task_label=self.experience.task_label)
+                self._after_eval_forward(**kwargs)
                 obs, reward, done, info = self.environment.step(action.item())
                 # TODO: use info
                 self.eval_rewards['past_returns'][ep_no] += reward
                 if done:
                     break
 
+            self._after_eval_iteration(**kwargs)
             self.eval_ep_lengths[0].append(t)
 
         # needed if env comes from train stream and is thus shared
@@ -514,7 +520,11 @@ class RLBaseStrategy(BaseTemplate):
         if exp is not None:
             task_label = exp.task_label
 
-        return model(observations, *args, **kwargs, task_label=task_label)
+        self._before_forward(**kwargs)
+        output = model(observations, *args, **kwargs, task_label=task_label)
+        self._after_forward(**kwargs)
+
+        return output
     
     def make_optimizer(self):
         # we reset the optimizer's state after each experience.
@@ -526,7 +536,38 @@ class RLBaseStrategy(BaseTemplate):
         super()._after_training_exp(**kwargs)
         self.training_exp_counter += 1
 
-    # ???
+    def _before_training_iteration(self, **kwargs):
+        trigger_plugins(self, "before_training_iteration", **kwargs)
+
     def _after_training_iteration(self, **kwargs):
-        for p in self.plugins:
-            p.after_training_iteration(self, **kwargs)
+        trigger_plugins(self, "after_training_iteration", **kwargs)
+
+    def _before_forward(self, **kwargs):
+        trigger_plugins(self, "before_forward", **kwargs)
+
+    def _after_forward(self, **kwargs):
+        trigger_plugins(self, "after_forward", **kwargs)
+
+    def _before_backward(self, **kwargs):
+        trigger_plugins(self, "before_backward", **kwargs)
+
+    def _after_backward(self, **kwargs):
+        trigger_plugins(self, "after_backward", **kwargs)
+
+    def _before_update(self, **kwargs):
+        trigger_plugins(self, "before_update", **kwargs)
+
+    def _after_update(self, **kwargs):
+        trigger_plugins(self, "after_update", **kwargs)
+
+    def _before_eval_iteration(self, **kwargs):
+        trigger_plugins(self, "before_eval_iteration", **kwargs)
+
+    def _before_eval_forward(self, **kwargs):
+        trigger_plugins(self, "before_eval_forward", **kwargs)
+
+    def _after_eval_forward(self, **kwargs):
+        trigger_plugins(self, "after_eval_forward", **kwargs)
+
+    def _after_eval_iteration(self, **kwargs):
+        trigger_plugins(self, "after_eval_iteration", **kwargs)

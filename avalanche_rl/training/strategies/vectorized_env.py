@@ -94,7 +94,7 @@ def make_actor_atari_env(
     # state = np.zeros_like(atari_state, dtype=atari_state.dtype)
     # state[:] = atari_state
     env = make_env(env_id, wrappers=wrappers)
-    env.unwrapped.restore_state(atari_state)
+    env.unwrapped.restore_full_state(atari_state)
 
     return env
 
@@ -132,19 +132,13 @@ class VectorizedEnvironment(object):
             # avoid reference to same object, make sure each actor gets
             # own environment
             # deepcopy isn't guaranteed to work with (wrapped) atari envs
-            print(envs.spec)
-            print(hasattr(envs.spec, 'entry_point'))
-            print('atari' in envs.spec.entry_point, envs.spec.entry_point)
             if hasattr(envs.spec, 'entry_point') and \
-                    'atari' in envs.spec.entry_point:
-                
-                print("---- A ----")
-                
+                    'atari' in envs.spec.entry_point:        
                 # copy kept in local for accessing env spec/attrs
                 # using this class
                 self.env = envs
                 env_id = envs.spec.id
-                atari_state = envs.unwrapped.clone_state(include_rng=True)
+                atari_state = envs.unwrapped.clone_full_state()
 
                 # actor will instatiate environment locally
                 envs = [make_actor_atari_env for _ in range(n_envs)]
@@ -155,7 +149,6 @@ class VectorizedEnvironment(object):
                     env_id=env_id, wrappers=wrappers_generators,
                     atari_state=atari_state)
             else:
-                print("---- B ----")
                 self.env = envs
                 envs = [deepcopy(envs) for _ in range(n_envs)]
         elif type(envs) is list:
