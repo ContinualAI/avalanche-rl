@@ -1,9 +1,7 @@
-import argparse
 import gym
-from avalanche_rl.envs import *
 import cv2 
 from argparse import ArgumentParser
-import argparse
+from avalanche_rl.envs import *
 
 if __name__ == "__main__":
     args = ArgumentParser()
@@ -13,7 +11,13 @@ if __name__ == "__main__":
     # args.add_argument('args', nargs=argparse.REMAINDER)
     args, extras = args.parse_known_args()
 
-    # env = gym.make(args.env, gravity=0.001, length=1., masscart=1000., force_mag=1.)
+    # env = gym.make(
+    #     args.env, 
+    #     gravity=0.001, 
+    #     length=1., 
+    #     masscart=1000., 
+    #     force_mag=1.
+    # )
     extras_dict = {}
     for i in range(0, len(extras), 2):
         key, val = extras[i:i+2]

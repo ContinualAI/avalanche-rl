@@ -6,13 +6,11 @@ from typing import List, Union
 
 
 class A2CModel(nn.Module):
-
     def __init__(self):
         super().__init__()
 
-    def forward(
-            state: torch.Tensor, compute_policy=True, compute_value=True,
-            task_label=None):
+    def forward(state: torch.Tensor, compute_policy=True, compute_value=True,
+                task_label=None):
         raise NotImplementedError()
 
     @torch.no_grad()
@@ -23,7 +21,6 @@ class A2CModel(nn.Module):
 
 
 class ActorCriticMLP(A2CModel):
-
     def __init__(
             self, num_inputs, num_actions,
             actor_hidden_sizes: Union[int, List[int]] = [64, 64],
@@ -80,11 +77,12 @@ class ActorCriticMLP(A2CModel):
 
 class ConvActorCritic(A2CModel):
     """
-        Smaller version of the Convolutional DQN network introduced in Mnih et al 2013 (DQN paper),
-        re-used for experiments in Mnih et al. 2016 (A3C paper).
+        Smaller version of the Convolutional DQN network introduced in
+        Mnih et al 2013 (DQN paper), re-used for experiments in
+        Mnih et al. 2016 (A3C paper).
     """
-
-    def __init__(self, input_channels, image_shape, n_actions, batch_norm=False):
+    def __init__(self, input_channels, image_shape, n_actions,
+                 batch_norm=False):
         super(ConvActorCritic, self).__init__()
 
         self.conv1 = nn.Conv2d(input_channels, 16, 8, stride=4)
@@ -104,7 +102,8 @@ class ConvActorCritic(A2CModel):
         self.actor = nn.Linear(256, n_actions)
         self.critic = nn.Linear(256, n_actions)
 
-    def forward(self, x, compute_policy=True, compute_value=True, task_label=None):
+    def forward(self, x, compute_policy=True, compute_value=True,
+                task_label=None):
         value, policy_logits = None, None
 
         # shared backbone of the actor-critic network

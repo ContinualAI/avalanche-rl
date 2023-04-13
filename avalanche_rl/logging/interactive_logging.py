@@ -6,12 +6,12 @@ from tqdm import tqdm
 from avalanche.training.templates.base import BaseTemplate
 from avalanche_rl.logging.strategy_logger import RLStrategyLogger
 
+
 class TqdmWriteInteractiveLogger(InteractiveLogger, RLStrategyLogger):
     """
     Allows to print out stats to console while updating
     progress bar whitout breaking it.
     """
-
     def __init__(self, log_every: int = 1):
         # print("__init__")
         super().__init__()
@@ -32,7 +32,8 @@ class TqdmWriteInteractiveLogger(InteractiveLogger, RLStrategyLogger):
         super().before_training_exp(strategy, metric_values, **kwargs)
         self._progress.total = strategy.current_experience_steps.value
 
-    def after_training_exp(self, strategy: 'BaseTemplate', metric_values: List['MetricValue'], **kwargs):
+    def after_training_exp(self, strategy: 'BaseTemplate',
+                           metric_values: List['MetricValue'], **kwargs):
         # print("after_training_exp")
         self._end_progress()
         return super().after_training_exp(strategy, metric_values, **kwargs)
@@ -48,7 +49,8 @@ class TqdmWriteInteractiveLogger(InteractiveLogger, RLStrategyLogger):
             self.metric_vals = {}
         self.step_counter += 1
 
-    def before_eval(self, strategy: 'BaseTemplate', metric_values: List['MetricValue'], **kwargs):
+    def before_eval(self, strategy: 'BaseTemplate', 
+                    metric_values: List['MetricValue'], **kwargs):
         # print("before_eval")
         self.metric_vals = {}
         tqdm.write('\n-- >> Start of eval phase << --', file=self.file)
@@ -63,9 +65,11 @@ class TqdmWriteInteractiveLogger(InteractiveLogger, RLStrategyLogger):
         task_id = strategy.experience.task_label
         stream = stream_type(strategy.experience)
         tqdm.write('-- Starting {} on experience {} (Task {}) from {} stream --'
-                   .format(action_name, exp_id, task_id, stream), file=self.file)
+                   .format(action_name, exp_id, task_id, stream), file=self.file
+                   )
 
-    def after_eval_exp(self, strategy: 'BaseTemplate', metric_values: List['MetricValue'], **kwargs):
+    def after_eval_exp(self, strategy: 'BaseTemplate', 
+                       metric_values: List['MetricValue'], **kwargs):
         # print("after_eval_exp")
         # for val in metric_values:
         self.log_metrics(metric_values)
@@ -76,7 +80,8 @@ class TqdmWriteInteractiveLogger(InteractiveLogger, RLStrategyLogger):
                    f'from {stream_type(strategy.experience)} stream ended.',
                    file=self.file)
 
-    def after_eval(self, strategy: 'BaseTemplate', metric_values: List['MetricValue'], **kwargs):
+    def after_eval(self, strategy: 'BaseTemplate', 
+                   metric_values: List['MetricValue'], **kwargs):
         tqdm.write('-- >> End of eval phase << --\n', file=self.file)
         # self.print_current_metrics()
         self.metric_vals = {}

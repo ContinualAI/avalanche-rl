@@ -7,6 +7,7 @@ from avalanche.training.templates.base import BaseTemplate
 from typing import List
 import numpy as np
 
+
 class MovingWindowedStat(RLPluginMetric[float]):
     def __init__(self, window_size: int, stat: str = 'mean',
                  name: str = 'Moving Windowed Stat', mode='train'):
@@ -40,9 +41,10 @@ class MovingWindowedStat(RLPluginMetric[float]):
         raise NotImplementedError()
 
     def emit(self):
-        # TODO: only emit once we have completed at least one episode (e.g. we have one return)?
-        # you must emit at every timestep or you can't figure out experience lenght when gathering 
-        # with `get_all_metrics`, that's not great
+        # TODO: only emit once we have completed at least one episode 
+        # (e.g. we have one return)?
+        # you must emit at every timestep or you can't figure out experience
+        # lenght when gathering with `get_all_metrics`, that's not great
         values = self.result()
         self.x_coord += 1
         return [MetricValue(self, str(self), values, self.x_coord)]
@@ -56,7 +58,8 @@ class MovingWindowedStat(RLPluginMetric[float]):
     def __str__(self) -> str:
         def camelcase(s: str):
             return s[0].upper() + s[1:].lower()
-        return f'[{camelcase(self._mode)}] {camelcase(self._stat)} {self.name} (last {self.window_size} steps)'
+        return f'[{camelcase(self._mode)}] {camelcase(self._stat)} {self.name} \
+                (last {self.window_size} steps)'
 
 
 def moving_window_stat(
@@ -71,9 +74,11 @@ def moving_window_stat(
     metrics = []
     for m in mode:
         if metric == 'reward':
-            metrics += list(map(lambda s: ReturnPluginMetric(window_size, s, mode=m), stats))
+            metrics += list(map(lambda s: ReturnPluginMetric(window_size, s,
+                                                             mode=m), stats))
         elif metric == 'ep_length':
-            metrics += list(map(lambda s: EpLenghtPluginMetric(window_size, s, mode=m), stats))
+            metrics += list(map(lambda s: EpLenghtPluginMetric(window_size, s,
+                                                               mode=m), stats))
     return metrics
 
 # TODO: immediate reward metric
@@ -83,7 +88,6 @@ class ReturnPluginMetric(MovingWindowedStat):
     """
         Keep track of sum of rewards (returns) per episode.
     """
-
     def __init__(
             self, window_size: int, stat: str = 'mean', name: str = 'Reward',
             mode: str = 'train'):
@@ -91,8 +95,11 @@ class ReturnPluginMetric(MovingWindowedStat):
         self._last_returns_len = 0
 
     def update(self, strategy):
-        rewards = strategy.eval_rewards if self._mode == 'eval' else strategy.rewards 
-        # for efficiency, only loop through last *not seen* `window_size` returns (full episodes) 
+        rewards = strategy.eval_rewards \
+                if self._mode == 'eval' \
+                else strategy.rewards 
+        # for efficiency, only loop through last *not seen* `window_size
+        # returns (full episodes) 
         new_returns = self._moving_window.window_size
         if self._mode == 'train':
             new_returns = len(rewards['past_returns'])-self._last_returns_len
@@ -130,14 +137,15 @@ class ReturnPluginMetric(MovingWindowedStat):
 
 
 class EpLenghtPluginMetric(MovingWindowedStat):
-
     def __init__(self, window_size: int, stat: str = 'mean',
                  name: str = 'Episode Length', mode='train'):
         super().__init__(window_size, stat=stat, name=name, mode=mode)
         self._actor_ep_lengths = defaultdict(lambda: 0)
 
     def update(self, strategy):
-        lengths = strategy.eval_ep_lengths if self._mode == 'eval' else strategy.ep_lengths 
+        lengths = strategy.eval_ep_lengths \
+                if self._mode == 'eval' \
+                else strategy.ep_lengths 
         new_ep_lengths = self._moving_window.window_size
         # iterate over parallel envs episodes (actor_id->ep_lengths)
         for actor_id, actor_ep_lengths in lengths.items():
@@ -153,7 +161,9 @@ class EpLenghtPluginMetric(MovingWindowedStat):
             for ep_len in actor_ep_lengths[-new_ep_lengths:]: 
                 self._moving_window.update(ep_len)
 
-    # TODO: we could use same system GenericFloatMetric to specify reset callbacks
+    # TODO:
+    # we could use same system GenericFloatMetricto specify reset callbacks
+
     # Train
     def before_training_exp(self, strategy: 'BaseTemplate') -> 'MetricResult':
         if self._mode == 'train':
@@ -179,7 +189,6 @@ class EpLenghtPluginMetric(MovingWindowedStat):
 
 class GenericFloatMetric(RLPluginMetric[float]):
     # Logs output of a simple float value without too many bells and whistles 
-
     def __init__(self, metric_variable_name: str, name: str,
                  reset_value: float = None, emit_on=['after_rollout'],
                  update_on=['after_rollout'], reset_on=[]):
