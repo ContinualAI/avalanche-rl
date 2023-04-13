@@ -1,12 +1,11 @@
 from collections import defaultdict
 from avalanche_rl.evaluation.metric_definitions import RLPluginMetric
-from avalanche.evaluation.metric_definitions import MetricValue, GenericPluginMetric
+from avalanche.evaluation.metric_definitions import MetricValue
 from avalanche.evaluation.metric_results import MetricResult
 from avalanche_rl.evaluation.metrics.mean import WindowedMovingAverage
-from avalanche.training.strategies.base_strategy import BaseStrategy
-from typing import Dict, Union, List
+from avalanche.training.templates.base import BaseTemplate
+from typing import List
 import numpy as np
-
 
 class MovingWindowedStat(RLPluginMetric[float]):
     def __init__(self, window_size: int, stat: str = 'mean',
@@ -37,7 +36,7 @@ class MovingWindowedStat(RLPluginMetric[float]):
         if self._stat == 'sum':
             return np.sum(self._moving_window.window)
 
-    def update(self, strategy: 'BaseStrategy'):
+    def update(self, strategy: 'BaseTemplate'):
         raise NotImplementedError()
 
     def emit(self):
@@ -107,7 +106,7 @@ class ReturnPluginMetric(MovingWindowedStat):
             self._moving_window.update(return_)
 
     # Train
-    def before_training_exp(self, strategy: 'BaseStrategy') -> 'MetricResult':
+    def before_training_exp(self, strategy: 'BaseTemplate') -> 'MetricResult':
         if self._mode == 'train':
             # reset on new experience
             self.reset()
@@ -119,11 +118,11 @@ class ReturnPluginMetric(MovingWindowedStat):
             return self.emit()
 
     # Eval
-    def before_eval_exp(self, strategy: 'BaseStrategy') -> MetricResult:
+    def before_eval_exp(self, strategy: 'BaseTemplate') -> MetricResult:
         if self._mode == 'eval':
             self.reset()
 
-    def after_eval_exp(self, strategy: 'BaseStrategy') -> MetricResult:
+    def after_eval_exp(self, strategy: 'BaseTemplate') -> MetricResult:
         if self._mode == 'eval':
             self.update(strategy)
             # in eval we always complete at least one episode
@@ -156,7 +155,7 @@ class EpLenghtPluginMetric(MovingWindowedStat):
 
     # TODO: we could use same system GenericFloatMetric to specify reset callbacks
     # Train
-    def before_training_exp(self, strategy: 'BaseStrategy') -> 'MetricResult':
+    def before_training_exp(self, strategy: 'BaseTemplate') -> 'MetricResult':
         if self._mode == 'train':
             # reset on new experience
             self.reset()
@@ -168,11 +167,11 @@ class EpLenghtPluginMetric(MovingWindowedStat):
             return self.emit()
 
     # Eval
-    def before_eval_exp(self, strategy: 'BaseStrategy') -> MetricResult:
+    def before_eval_exp(self, strategy: 'BaseTemplate') -> MetricResult:
         if self._mode == 'eval':
             self.reset()
 
-    def after_eval_exp(self, strategy: 'BaseStrategy') -> MetricResult:
+    def after_eval_exp(self, strategy: 'BaseTemplate') -> MetricResult:
         if self._mode == 'eval':
             self.update(strategy)
             return self.emit()
