@@ -25,7 +25,7 @@ class Actor:
             self.env = env
         else:
             self.env: gym.Env = env(**env_kwargs)
-        # print("Actor env", self.env, id(self.env), self.env.reset().shape)
+        print("Actor env", self.env, id(self.env), self.env.reset().shape)
 
         self.id = actor_id
         # allows you to have batches of fixed size independently of episode
@@ -132,8 +132,14 @@ class VectorizedEnvironment(object):
             # avoid reference to same object, make sure each actor gets
             # own environment
             # deepcopy isn't guaranteed to work with (wrapped) atari envs
+            print(envs.spec)
+            print(hasattr(envs.spec, 'entry_point'))
+            print('atari' in envs.spec.entry_point, envs.spec.entry_point)
             if hasattr(envs.spec, 'entry_point') and \
                     'atari' in envs.spec.entry_point:
+                
+                print("---- A ----")
+                
                 # copy kept in local for accessing env spec/attrs
                 # using this class
                 self.env = envs
@@ -149,6 +155,7 @@ class VectorizedEnvironment(object):
                     env_id=env_id, wrappers=wrappers_generators,
                     atari_state=atari_state)
             else:
+                print("---- B ----")
                 self.env = envs
                 envs = [deepcopy(envs) for _ in range(n_envs)]
         elif type(envs) is list:
