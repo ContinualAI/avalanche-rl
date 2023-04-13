@@ -5,7 +5,7 @@ from avalanche.models.simple_mlp import SimpleMLP
 from torch.optim import Adam
 import torch.nn as nn
 import numpy as np
-from avalanche_rl.benchmarks.generators.rl_benchmark_generators import gym_benchmark_generator
+from avalanche_rl.benchmarks.rl_benchmark_generators import gym_benchmark_generator
 
 
 # for testing purposes implement all methods needed to have a working RL Strategy
