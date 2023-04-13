@@ -292,7 +292,7 @@ class RLBaseStrategy(BaseTemplate):
             env = VectorizedEnvironment(
                 self.environment, self.n_envs, auto_reset=True,
                 wrappers_generators=None,
-                ray_kwargs={'num_cpus': cpus})
+                ray_kwargs={'num_cpus': cpus, 'num_gpus': 0})
         # NOTE: `info['terminal_observation']`` is NOT converted to tensor 
         return Array2Tensor(env)
 

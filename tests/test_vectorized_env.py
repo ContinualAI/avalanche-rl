@@ -36,7 +36,7 @@ def test_no_env():
 
 def test_with_env_object():
     env = gym.make('CartPole-v1')
-    env = VectorizedEnvironment(env, 1, ray_kwargs={'num_cpus': 1})
+    env = VectorizedEnvironment(env, 1, ray_kwargs={'num_cpus': 1, 'num_gpus': 0})
     assert len(env.actors) == 1
     ref = env.actors[0].environment.remote()
     env = ray.get(ref)
@@ -44,7 +44,7 @@ def test_with_env_object():
 
 
 def test_single_env_single_cpu_reset():
-    env = VectorizedEnvironment(make_env, 1, ray_kwargs={'num_cpus': 1})
+    env = VectorizedEnvironment(make_env, 1, ray_kwargs={'num_cpus': 1, 'num_gpus': 0})
     # check env
     ref = env.actors[0].environment.remote()
     e = ray.get(ref)
@@ -65,7 +65,7 @@ def test_single_env_single_cpu_reset():
 @pytest.mark.parametrize(['n_envs', 'n_cpu'], [[2, 3], [1, 2]])
 def test_multiple_envs_reset(n_envs: int, n_cpu: int):
     env = VectorizedEnvironment(
-        make_env, n_envs, ray_kwargs={'num_cpus': n_cpu})
+        make_env, n_envs, ray_kwargs={'num_cpus': n_cpu, 'num_gpus': 0})
     obs = env.reset()
     assert obs.shape == (n_envs, 4)
     env.close()
