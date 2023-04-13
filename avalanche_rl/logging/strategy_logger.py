@@ -10,13 +10,13 @@ class RLStrategyLogger(BaseLogger):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-    def before_rollout(self, strategy: "BaseTemplate", metric_values: List["MetricValue"], **kwargs):
-        for val in metric_values:
-            self.log_metric(val, "before_rollout")
+    def before_rollout(self, strategy, metric_values: List["MetricValue"]):
+        # for val in metric_values:
+        self.log_metrics(metric_values)
 
-    def after_rollout(self, strategy: "BaseTemplate", metric_values: List["MetricValue"], **kwargs):
-        for val in metric_values:
-            self.log_metric(val, "after_rollout")
+    def after_rollout(self, strategy, metric_values: List["MetricValue"]):
+        # for val in metric_values:
+        self.log_metrics(metric_values)
 
 
 __all__ = ["RLStrategyLogger"]

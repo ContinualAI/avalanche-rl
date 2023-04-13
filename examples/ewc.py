@@ -75,6 +75,9 @@ if __name__ == "__main__":
             if strategy.training_exp_counter % 2 == 1:
                 strategy._init_eps = strategy._init_eps / 2
 
+        def after_training_iteration(self, strategy, **kwargs):
+            pass
+
     # adapted hyperparams from https://github.com/DLR-RM/rl-baselines3-zoo/blob/master/hyperparams/dqn.yml
     # we run 6 experiences, alternating between the 2 games: the first two are longer (1e5 steps) the rest
     # are shorter (3e4 steps)

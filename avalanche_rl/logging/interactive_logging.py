@@ -13,11 +13,13 @@ class TqdmWriteInteractiveLogger(InteractiveLogger, RLStrategyLogger):
     """
 
     def __init__(self, log_every: int = 1):
+        # print("__init__")
         super().__init__()
         self.log_every = log_every
         self.step_counter: int = 0
 
     def print_current_metrics(self):
+        # print("print_current_metrics")
         sorted_vals = sorted(self.metric_vals.values(),
                              key=lambda x: x[0])
         for name, x, val in sorted_vals:
@@ -26,13 +28,16 @@ class TqdmWriteInteractiveLogger(InteractiveLogger, RLStrategyLogger):
 
     def before_training_exp(self, strategy: 'BaseTemplate',
                             metric_values: List['MetricValue'], **kwargs):
+        # print("before_training_exp")
         super().before_training_exp(strategy, metric_values, **kwargs)
         self._progress.total = strategy.current_experience_steps.value
 
     def after_training_exp(self, strategy: 'BaseTemplate', metric_values: List['MetricValue'], **kwargs):
+        # print("after_training_exp")
         self._end_progress()
         return super().after_training_exp(strategy, metric_values, **kwargs)
 
+    # ??????????????
     def after_training_iteration(self, strategy: 'BaseTemplate',
                                  metric_values: List['MetricValue'], **kwargs):
         self._progress.update()
@@ -44,11 +49,13 @@ class TqdmWriteInteractiveLogger(InteractiveLogger, RLStrategyLogger):
         self.step_counter += 1
 
     def before_eval(self, strategy: 'BaseTemplate', metric_values: List['MetricValue'], **kwargs):
+        # print("before_eval")
         self.metric_vals = {}
         tqdm.write('\n-- >> Start of eval phase << --', file=self.file)
 
     def before_eval_exp(self, strategy: 'BaseTemplate',
                         metric_values: List['MetricValue'], **kwargs):
+        # print("before_eval_exp")
         # super().before_eval_exp(strategy, metric_values, **kwargs)
         # self._progress.total = strategy.eval_exp_len
         action_name = 'training' if strategy.is_training else 'eval'
@@ -59,8 +66,9 @@ class TqdmWriteInteractiveLogger(InteractiveLogger, RLStrategyLogger):
                    .format(action_name, exp_id, task_id, stream), file=self.file)
 
     def after_eval_exp(self, strategy: 'BaseTemplate', metric_values: List['MetricValue'], **kwargs):
-        for val in metric_values:
-            self.log_metric(val, 'after_update')
+        # print("after_eval_exp")
+        # for val in metric_values:
+        self.log_metrics(metric_values)
         self.print_current_metrics()
         exp_id = strategy.experience.current_experience
         tqdm.write(f'> Eval on experience {exp_id} (Task '

@@ -5,6 +5,7 @@ import torch.nn as nn
 from avalanche.training.templates.base import BaseTemplate
 from avalanche.benchmarks.scenarios.rl_scenario import RLExperience
 from avalanche.training.plugins.clock import Clock
+from avalanche.training.plugins.evaluation import EvaluationPlugin
 from avalanche.core import BasePlugin
 from avalanche.models.dynamic_optimizers import reset_optimizer
 from avalanche_rl.training.strategies.env_wrappers import *
@@ -131,8 +132,13 @@ class RLBaseStrategy(BaseTemplate):
         
         self.optimizer = optimizer
         self._criterion = criterion
-        self.evaluator = evaluator
         self.eval_every = eval_every
+        
+        # self.evaluator = evaluator
+        if evaluator is None:
+            evaluator = EvaluationPlugin()
+        self.plugins.append(evaluator)
+        self.evaluator = evaluator
 
         self.training_exp_counter = 0
         """ Counts the number of training steps. +1 at the end of each 
@@ -347,7 +353,7 @@ class RLBaseStrategy(BaseTemplate):
                 self.optimizer.step()
                 # self._after_update(**kwargs)
 
-            # self._after_training_iteration(**kwargs)
+            self._after_training_iteration(**kwargs)
             # periodic evaluation
             self._periodic_eval(eval_streams, do_final=False)
 
@@ -474,3 +480,8 @@ class RLBaseStrategy(BaseTemplate):
     def _after_training_exp(self, **kwargs):
         super()._after_training_exp(**kwargs)
         self.training_exp_counter += 1
+
+    # ???
+    def _after_training_iteration(self, **kwargs):
+        for p in self.plugins:
+            p.after_training_iteration(self, **kwargs)
