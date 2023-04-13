@@ -1,18 +1,18 @@
 import torch
 import torch.nn as nn
 import numpy as np
-from .rl_base_strategy import RLBaseStrategy, Timestep
-from .buffers import Rollout, ReplayMemory
-from torch.optim.optimizer import Optimizer
-from typing import Union, Optional, Sequence, List
-from avalanche.training.plugins.strategy_plugin import StrategyPlugin
-from torch.optim import Optimizer
 import copy
 import random
+from .rl_base_strategy import RLBaseStrategy, Timestep
+from .buffers import Rollout, ReplayMemory
+from avalanche.core import BasePlugin
 from avalanche_rl.training import default_rl_logger
 from avalanche_rl.evaluation.metrics.reward import GenericFloatMetric
 from avalanche_rl.training.plugins.evaluation import RLEvaluationPlugin
 from avalanche_rl.models.dqn import DQNModel
+from torch.optim.optimizer import Optimizer
+from torch.optim import Optimizer
+from typing import Union, Optional, Sequence, List
 
 default_dqn_logger = RLEvaluationPlugin(
     *default_rl_logger.metrics,
@@ -21,9 +21,7 @@ default_dqn_logger = RLEvaluationPlugin(
         emit_on=['after_rollout']),
     loggers=default_rl_logger.loggers)
 
-
 class DQNStrategy(RLBaseStrategy):
-
     def __init__(
             self, model: DQNModel, optimizer: Optimizer,
             per_experience_steps: Union[int, Timestep, List[Timestep]], 
@@ -41,7 +39,7 @@ class DQNStrategy(RLBaseStrategy):
             target_net_update_interval: Union[int, Timestep] = 10000,
             polyak_update_tau: float = 1.,  # set to 1. to hard copy
             device='cpu',
-            plugins: Optional[Sequence[StrategyPlugin]] = [],
+            plugins: Optional[Sequence[BasePlugin]] = [],
             reset_replay_on_new_experience: bool = True,
             initial_replay_memory: ReplayMemory = None,
             evaluator=default_dqn_logger, **kwargs):
@@ -120,7 +118,7 @@ class DQNStrategy(RLBaseStrategy):
 
         # adjust number of rollouts per step in order to assign equal load to each parallel actor
         self.rollouts_per_step = self.rollouts_per_step // self.n_envs
-        return super()._before_training_exp()
+        return super()._before_training_exp(**kwargs)
 
     def before_rollout(self, **kwargs):
         # update exploration rate

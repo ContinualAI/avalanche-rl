@@ -1,11 +1,11 @@
-from gym.core import Wrapper
 import ray
 import gym
-from gym.spaces import Space
-from typing import Callable, List, Union, Dict, Any
 import numpy as np
 import multiprocessing
 import types
+from gym.core import Wrapper
+from gym.spaces import Space
+from typing import Callable, List, Union, Dict, Any
 from copy import deepcopy
 from ale_py._ale_py import ALEState
 
@@ -81,7 +81,7 @@ class Actor:
 def make_actor_atari_env(
         env_id: str, wrappers: List[Wrapper],
         atari_state: ALEState):
-    from avalanche_rl.benchmarks.generators.rl_benchmark_generators import make_env
+    from avalanche_rl.benchmarks.rl_benchmark_generators import make_env
 
     # ray shared arrays are read-only objects https://docs.ray.io/en/master/serialization.html#numpy-arrays
     # we need to clone state in actors local memory because of `restore_full_state` which uses `as_ctypes`

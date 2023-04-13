@@ -2,24 +2,22 @@ import torch
 import torch.nn as nn
 from .rl_base_strategy import RLBaseStrategy, Timestep, TimestepUnit
 from .buffers import Rollout
-from torch.optim.optimizer import Optimizer
-from typing import Union, Optional, Sequence, List
-from avalanche_rl.training.plugins.strategy_plugin import RLStrategyPlugin
-from torch.optim import Optimizer
-from torch.distributions import Categorical
+from avalanche.core import BasePlugin
 from avalanche_rl.training import default_rl_logger
 from avalanche_rl.models.actor_critic import A2CModel
-
+from torch.optim.optimizer import Optimizer
+from torch.optim import Optimizer
+from torch.distributions import Categorical
+from typing import Union, Optional, Sequence, List
 
 class A2CStrategy(RLBaseStrategy):
-
     def __init__(
             self, model: A2CModel, optimizer: Optimizer,
             per_experience_steps: Union[int, Timestep, List[Timestep]],
             max_steps_per_rollout: int = 5,
             value_criterion=nn.MSELoss(),
             device='cpu',
-            plugins: Optional[Sequence[RLStrategyPlugin]] = [],
+            plugins: Optional[Sequence[BasePlugin]] = [],
             eval_every: int = -1, eval_episodes: int = 1, 
             policy_loss_weight: float = 0.5,
             value_loss_weight: float = 0.5,
