@@ -1,20 +1,15 @@
+import gym
+import random
+from avalanche.benchmarks.scenarios.rl_scenario import RLScenario
+from avalanche_rl.training.strategies.env_wrappers import ClipRewardWrapper, FireResetWrapper, FrameStackingWrapper
 from collections import defaultdict
 from gym.core import Wrapper
-from avalanche_rl.benchmarks.rl_benchmark import RLScenario
-import gym
 from gym import envs
-from typing import *
-from gym.wrappers.time_limit import TimeLimit
-import numpy as np
-import importlib.util
 from gym.wrappers.atari_preprocessing import AtariPreprocessing
-from avalanche_rl.training.strategies.env_wrappers import ClipRewardWrapper, FireResetWrapper, FrameStackingWrapper
-import random
-
+from typing import *
 
 def get_all_envs_id():
     return envs.registry.env_specs.keys()
-
 
 def get_all_atari_envs_id(no_frameskip_only: bool = True):
     all_envs = envs.registry.all()
@@ -27,7 +22,6 @@ def get_all_atari_envs_id(no_frameskip_only: bool = True):
 
     return atari_envs
 
-
 def make_env(
         env_name: str, env_kwargs: Dict[Any, Any] = dict(),
         wrappers: Wrapper = None):
@@ -37,7 +31,6 @@ def make_env(
         for wrapper in wrappers:
             env = wrapper(env)
     return env
-
 
 def gym_benchmark_generator(
         env_names: List[str] = [],
@@ -129,15 +122,21 @@ def gym_benchmark_generator(
             "Unrecognized type for `eval_envs`, make sure to pass a list of environments or of environment names.")
 
     # envs will be cycled through if n_experiences > len(envs_) otherwise only the first n will be used
-    n_experiences = n_experiences if n_experiences is not None else len(envs_)         
+    n_experiences = n_experiences or len(envs_)         
+    if n_experiences < len(envs_):
+        envs_ = envs_[:n_experiences]
+    elif n_experiences > len(envs_):
+        # cycle through envs sequentially, referencing same object
+        for i in range(n_experiences - len(envs_)):
+            envs_.append(envs_[i % len(envs_)])       
+    
     # # per_experience_episodes variable number of episodes depending on env
     # if type(per_experience_episodes) is list:
     #     assert len(per_experience_episodes) == n_experiences
 
-    return RLScenario(
-        envs=envs_, n_experiences=n_experiences,
-        n_parallel_envs=n_parallel_envs, eval_envs=eval_envs, wrappers_generators=wrappers, *args, **kwargs)
-
+    return RLScenario(envs=envs_, n_parallel_envs=n_parallel_envs, 
+                      eval_envs=eval_envs, wrappers_generators=wrappers,
+                      *args, **kwargs)
 
 def atari_benchmark_generator(
         env_names: List[str] = [],
@@ -198,90 +197,90 @@ def atari_benchmark_generator(
         envs_ids_to_sample_from=atari_ids, *args, **kwargs)
 
 
-# check AvalancheLab extra dependency
-if importlib.util.find_spec('continual_habitat_lab') is not None and importlib.util.find_spec('habitat_sim') is not None:
-    from continual_habitat_lab import ContinualHabitatLabConfig, ContinualHabitatEnv
-    from continual_habitat_lab.scene_manager import SceneManager
-    from avalanche_rl.training.strategies.rl_base_strategy import TimestepUnit, Timestep
+# # check AvalancheLab extra dependency
+# if importlib.util.find_spec('continual_habitat_lab') is not None and importlib.util.find_spec('habitat_sim') is not None:
+#     from continual_habitat_lab import ContinualHabitatLabConfig, ContinualHabitatEnv
+#     from continual_habitat_lab.scene_manager import SceneManager
+#     from avalanche_rl.training.strategies.rl_base_strategy import TimestepUnit, Timestep
 
-    def _compute_experiences_length(
-            task_change_steps: int, scene_change_steps: int, n_exps: int,
-            unit: TimestepUnit) -> List[Timestep]:
-        # FIXME:
-        # change experience every time either task or scene changes (might happen at non-uniform timesteps) 
-        change1 = min(task_change_steps, scene_change_steps)
-        change2 = max(task_change_steps, scene_change_steps) - change1
+#     def _compute_experiences_length(
+#             task_change_steps: int, scene_change_steps: int, n_exps: int,
+#             unit: TimestepUnit) -> List[Timestep]:
+#         # FIXME:
+#         # change experience every time either task or scene changes (might happen at non-uniform timesteps) 
+#         change1 = min(task_change_steps, scene_change_steps)
+#         change2 = max(task_change_steps, scene_change_steps) - change1
 
-        # those two timestep will alternate
-        steps = [Timestep(change1, unit), Timestep(change2, unit)]
-        return [steps[i % 2] for i in range(n_exps)]
+#         # those two timestep will alternate
+#         steps = [Timestep(change1, unit), Timestep(change2, unit)]
+#         return [steps[i % 2] for i in range(n_exps)]
 
-    def habitat_benchmark_generator(
-            cl_habitat_lab_config: ContinualHabitatLabConfig,
-            # eval_config: ContinualHabitatLabConfig = None, 
-            max_steps_per_experience: int = 1000,
-            change_experience_on_scene_change: bool = False,
-            max_steps_per_episode: int = None,
-            wrapper_classes: List[Wrapper] = list(),
-            *args, **kwargs) -> Tuple[RLScenario, List[Timestep]]:
+#     def habitat_benchmark_generator(
+#             cl_habitat_lab_config: ContinualHabitatLabConfig,
+#             # eval_config: ContinualHabitatLabConfig = None, 
+#             max_steps_per_experience: int = 1000,
+#             change_experience_on_scene_change: bool = False,
+#             max_steps_per_episode: int = None,
+#             wrapper_classes: List[Wrapper] = list(),
+#             *args, **kwargs) -> Tuple[RLScenario, List[Timestep]]:
 
-        # number of experiences as the number of tasks defined in configuration
-        n_exps = len(cl_habitat_lab_config.tasks)
+#         # number of experiences as the number of tasks defined in configuration
+#         n_exps = len(cl_habitat_lab_config.tasks)
 
-        # compute number of steps per experience
-        steps_per_experience = Timestep(max_steps_per_experience)
-        task_len_in_episodes = cl_habitat_lab_config.task_iterator.get(
-            'max_task_repeat_episodes', -1)
-        if task_len_in_episodes is None:
-            task_len_in_episodes = -1
-        task_len_in_steps = cl_habitat_lab_config.task_iterator.get(
-            'max_task_repeat_steps', -1)
-        if task_len_in_steps is None:
-            task_len_in_steps = -1
+#         # compute number of steps per experience
+#         steps_per_experience = Timestep(max_steps_per_experience)
+#         task_len_in_episodes = cl_habitat_lab_config.task_iterator.get(
+#             'max_task_repeat_episodes', -1)
+#         if task_len_in_episodes is None:
+#             task_len_in_episodes = -1
+#         task_len_in_steps = cl_habitat_lab_config.task_iterator.get(
+#             'max_task_repeat_steps', -1)
+#         if task_len_in_steps is None:
+#             task_len_in_steps = -1
 
-        if task_len_in_episodes > 0:
-            steps_per_experience = Timestep(
-                task_len_in_episodes, TimestepUnit.EPISODES)
-        elif task_len_in_steps > 0:
-            steps_per_experience = Timestep(
-                task_len_in_steps, TimestepUnit.STEPS)
+#         if task_len_in_episodes > 0:
+#             steps_per_experience = Timestep(
+#                 task_len_in_episodes, TimestepUnit.EPISODES)
+#         elif task_len_in_steps > 0:
+#             steps_per_experience = Timestep(
+#                 task_len_in_steps, TimestepUnit.STEPS)
 
-        # whether to account every change of scene as a new experience (scene_path inhibits scene change)
-        if change_experience_on_scene_change and cl_habitat_lab_config.scene.scene_path is None:
-            # count number of scenes
-            sm = SceneManager(cl_habitat_lab_config)
-            for _, scenes in sm._scenes_by_dataset.items():
-                n_exps += len(scenes)
-            scene_change_in_episodes = cl_habitat_lab_config.scene.max_scene_repeat_episodes
-            scene_change_in_steps = cl_habitat_lab_config.scene.max_scene_repeat_steps
-            if scene_change_in_episodes > 0:
-                assert steps_per_experience.unit == TimestepUnit.EPISODES, "Step unit between simulator and avalanche setting must match!"
-                steps_per_experience = _compute_experiences_length(
-                    steps_per_experience.value, scene_change_in_episodes,
-                    n_exps, steps_per_experience.unit)
-            if scene_change_in_steps > 0:
-                assert steps_per_experience.unit == TimestepUnit.STEPS, "Step unit between simulator and avalanche setting must match!"
-                steps_per_experience = _compute_experiences_length(
-                    steps_per_experience.value, scene_change_in_steps, n_exps,
-                    steps_per_experience.unit)
-        else:
-            steps_per_experience = [steps_per_experience] * n_exps
+#         # whether to account every change of scene as a new experience (scene_path inhibits scene change)
+#         if change_experience_on_scene_change and cl_habitat_lab_config.scene.scene_path is None:
+#             # count number of scenes
+#             sm = SceneManager(cl_habitat_lab_config)
+#             for _, scenes in sm._scenes_by_dataset.items():
+#                 n_exps += len(scenes)
+#             scene_change_in_episodes = cl_habitat_lab_config.scene.max_scene_repeat_episodes
+#             scene_change_in_steps = cl_habitat_lab_config.scene.max_scene_repeat_steps
+#             if scene_change_in_episodes > 0:
+#                 assert steps_per_experience.unit == TimestepUnit.EPISODES, "Step unit between simulator and avalanche setting must match!"
+#                 steps_per_experience = _compute_experiences_length(
+#                     steps_per_experience.value, scene_change_in_episodes,
+#                     n_exps, steps_per_experience.unit)
+#             if scene_change_in_steps > 0:
+#                 assert steps_per_experience.unit == TimestepUnit.STEPS, "Step unit between simulator and avalanche setting must match!"
+#                 steps_per_experience = _compute_experiences_length(
+#                     steps_per_experience.value, scene_change_in_steps, n_exps,
+#                     steps_per_experience.unit)
+#         else:
+#             steps_per_experience = [steps_per_experience] * n_exps
 
-        # instatiate RLScenario from a given lab configuration
-        env = ContinualHabitatEnv(cl_habitat_lab_config)
-        # add plugin wrappers
-        for wrapper in wrapper_classes:
-            env = wrapper(env)
-        if max_steps_per_episode is not None:
-            env = TimeLimit(env, max_steps_per_episode)
+#         # instatiate RLScenario from a given lab configuration
+#         env = ContinualHabitatEnv(cl_habitat_lab_config)
+#         # add plugin wrappers
+#         for wrapper in wrapper_classes:
+#             env = wrapper(env)
+#         if max_steps_per_episode is not None:
+#             env = TimeLimit(env, max_steps_per_episode)
 
-        # TODO: evaluating on same env changes its state, must have some evaluation mode
-        # if eval_config is None:
-        # eval_env = env
+#         # TODO: evaluating on same env changes its state, must have some evaluation mode
+#         # if eval_config is None:
+#         # eval_env = env
 
-        # also return computed number of steps per experience
-        # NOTE: parallel_env only supported on distributed settings due to opengl lock
-        return RLScenario(
-            envs=[env],
-            n_experiences=n_exps, n_parallel_envs=1, eval_envs=[env],
-            *args, **kwargs), steps_per_experience
+#         # also return computed number of steps per experience
+#         # NOTE: parallel_env only supported on distributed settings due to opengl lock
+#         return RLScenario(
+#             envs=[env],
+#             n_experiences=n_exps, n_parallel_envs=1, eval_envs=[env],
+#             *args, **kwargs), steps_per_experience
