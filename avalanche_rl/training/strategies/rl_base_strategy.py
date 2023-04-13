@@ -175,15 +175,6 @@ class RLBaseStrategy(BaseTemplate):
         return self.per_experience_steps[self.experience.current_experience %
                                          len(self.per_experience_steps)]
 
-    # Additional callback added by RLBaseStrategy
-    def before_rollout(self, **kwargs):
-        for p in self.plugins:
-            p.before_rollout(self, **kwargs)
-
-    def after_rollout(self, **kwargs):
-        for p in self.plugins:
-            p.after_rollout(self, **kwargs)
-
     def sample_rollout_action(self, observations: torch.Tensor) -> np.ndarray:
         """
         Implements the action sampling a~Pi(s) where Pi is the parameterized
@@ -531,6 +522,15 @@ class RLBaseStrategy(BaseTemplate):
         # This allows to add new parameters (new heads) and
         # freezing old units during the model's adaptation phase.
         reset_optimizer(self.optimizer, self.model)
+
+    # Additional callback added by RLBaseStrategy
+    def before_rollout(self, **kwargs):
+        trigger_plugins(self, "before_rollout", **kwargs)
+
+    def after_rollout(self, **kwargs):
+        trigger_plugins(self, "after_rollout", **kwargs)
+
+    # Plugin Triggers
 
     def _after_training_exp(self, **kwargs):
         super()._after_training_exp(**kwargs)
