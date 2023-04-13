@@ -2,7 +2,7 @@ from avalanche_rl.logging.interactive_logging import TqdmWriteInteractiveLogger
 from avalanche_rl.training.strategies import A2CStrategy
 from avalanche_rl.models.actor_critic import ActorCriticMLP
 from torch.optim import Adam
-from avalanche_rl.benchmarks.generators.rl_benchmark_generators import gym_benchmark_generator
+from avalanche_rl.benchmarks.rl_benchmark_generators import gym_benchmark_generator
 import torch
 from avalanche_rl.training import default_rl_logger
 
@@ -34,9 +34,9 @@ if __name__ == "__main__":
         print("Start of experience ", experience.current_experience)
         print("Current Env ", experience.env)
         print("Current Task", experience.task_label, type(experience.task_label))
-        strategy.train(experience, scenario.test_stream)
+        strategy.train(experience, scenario.eval_stream)
 
     print('Training completed')
     eval_episodes = 100
     print(f"\nEvaluating on {eval_episodes} episodes!")
-    print(strategy.eval(scenario.test_stream))
+    print(strategy.eval(scenario.eval_stream))

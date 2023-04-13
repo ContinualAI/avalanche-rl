@@ -6,6 +6,7 @@ from avalanche.training.templates.base import BaseTemplate
 from avalanche.benchmarks.scenarios.rl_scenario import RLExperience
 from avalanche.training.plugins.clock import Clock
 from avalanche.core import BasePlugin
+from avalanche.models.dynamic_optimizers import reset_optimizer
 from avalanche_rl.training.strategies.env_wrappers import *
 from avalanche_rl.training import default_rl_logger
 from avalanche_rl.training.strategies.vectorized_env import VectorizedEnvironment
@@ -129,9 +130,13 @@ class RLBaseStrategy(BaseTemplate):
                 break
         
         self.optimizer = optimizer
-        self.criterion = criterion
+        self._criterion = criterion
         self.evaluator = evaluator
         self.eval_every = eval_every
+
+        self.training_exp_counter = 0
+        """ Counts the number of training steps. +1 at the end of each 
+        experience. """
 
     @property
     def current_experience_steps(self) -> Timestep:
@@ -327,9 +332,9 @@ class RLBaseStrategy(BaseTemplate):
 
                 # Backward
                 self.optimizer.zero_grad()
-                self._before_backward(**kwargs)
+                # self._before_backward(**kwargs)
                 self.loss.backward()
-                self._after_backward(**kwargs)
+                # self._after_backward(**kwargs)
 
                 # Gradient norm clipping
                 if self.max_grad_norm is not None:
@@ -338,11 +343,11 @@ class RLBaseStrategy(BaseTemplate):
                         self.max_grad_norm)
 
                 # Optimization step
-                self._before_update(**kwargs)
+                # self._before_update(**kwargs)
                 self.optimizer.step()
-                self._after_update(**kwargs)
+                # self._after_update(**kwargs)
 
-            self._after_training_iteration(**kwargs)
+            # self._after_training_iteration(**kwargs)
             # periodic evaluation
             self._periodic_eval(eval_streams, do_final=False)
 
@@ -459,3 +464,13 @@ class RLBaseStrategy(BaseTemplate):
             task_label = exp.task_label
 
         return model(observations, *args, **kwargs, task_label=task_label)
+    
+    def make_optimizer(self):
+        # we reset the optimizer's state after each experience.
+        # This allows to add new parameters (new heads) and
+        # freezing old units during the model's adaptation phase.
+        reset_optimizer(self.optimizer, self.model)
+
+    def _after_training_exp(self, **kwargs):
+        super()._after_training_exp(**kwargs)
+        self.training_exp_counter += 1

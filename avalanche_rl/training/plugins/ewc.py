@@ -1,12 +1,13 @@
 from avalanche.training.plugins.ewc import EWCPlugin
 from avalanche.training.utils import copy_params_dict, zerolike_params_dict
+from avalanche_rl.training.plugins.rl_plugins import RLStrategyPlugin
 from avalanche_rl.training.strategies.buffers import ReplayMemory
 from avalanche_rl.training.strategies import RLBaseStrategy
 from torch import Tensor
 from typing import Dict, Tuple
 
 
-class EWCRL(EWCPlugin):
+class EWCRL(EWCPlugin, RLStrategyPlugin):
     """
     Elastic Weight Consolidation (EWC) plugin for Reinforcement Learning, as presented
     in the original paper "Overcoming catastrophic forgetting in neural networks".
@@ -69,8 +70,10 @@ class EWCRL(EWCPlugin):
         if strategy.timestep >= self.ewc_start_timestep and strategy.training_exp_counter >= self.ewc_start_exp:
             return super().before_backward(strategy, **kwargs)
 
-    def compute_importances(
-            self, model, strategy: 'RLBaseStrategy', optimizer):
+    def compute_importances(self, model, strategy: 'RLBaseStrategy', optimizer):
+        
+        print("Computing Importances")
+
         # compute importances sampling minibatches from a replay memory/buffer
         model.train()
 
@@ -89,17 +92,20 @@ class EWCRL(EWCPlugin):
             optimizer.zero_grad()
             strategy.loss.backward()
 
-            for (k1, p), (k2, imp) in zip(model.named_parameters(), importances):
+            # print(model.named_parameters(), importances)
+            for (k1, p), (k2, imp) in zip(model.named_parameters(), importances.items()):
                 assert (k1 == k2)
                 if p.grad is not None:
-                    imp += p.grad.data.clone().pow(2)
+                    imp.data += p.grad.data.clone().pow(2)
 
         # average over number of batches 
-        for _, imp in importances:
-            imp /= float(self.fisher_updates_per_step)
-        optimizer.zero_grad()
+        for _, imp in importances.items():
+            imp.data /= float(self.fisher_updates_per_step)
 
         return importances
+    
+    def before_rollout(self, *args):
+        pass
 
 ParamDict = Dict[str, Tensor]
 EwcDataType = Tuple[ParamDict, ParamDict]

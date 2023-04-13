@@ -9,14 +9,14 @@
 from avalanche_rl.training.strategies.buffers import ReplayMemory
 import torch
 from torch.optim import Adam
-from avalanche_rl.training.plugins.evaluation import RLEvaluationPlugin
+from avalanche_rl.training.plugins.rl_plugins import RLEvaluationPlugin
 from avalanche_rl.training.strategies.dqn import DQNStrategy, default_dqn_logger
 from avalanche_rl.training.strategies.env_wrappers import ReducedActionSpaceWrapper
-from avalanche_rl.benchmarks.generators.rl_benchmark_generators import atari_benchmark_generator
+from avalanche_rl.benchmarks.rl_benchmark_generators import atari_benchmark_generator
 from avalanche_rl.training.plugins.ewc import EWCRL
 from avalanche_rl.logging import TensorboardLogger
 from avalanche_rl.models.dqn import EWCConvDeepQN
-from avalanche_rl.training.plugins.strategy_plugin import RLStrategyPlugin
+from avalanche_rl.training.plugins.rl_plugins import RLStrategyPlugin
 from avalanche_rl.training.strategies.rl_base_strategy import Timestep
 from avalanche_rl.evaluation.metrics.reward import GenericFloatMetric
 import json
@@ -45,10 +45,10 @@ if __name__ == "__main__":
     memory_size = 10000
     memory = ReplayMemory(size=memory_size, n_envs=n_envs)
     ewc_plugin = EWCRL(400., memory, mode='separate',
-                       start_ewc_after_experience=2)
+                       start_ewc_after_experience=1)
 
     # log to tensorboard
-    tb_logger = TensorboardLogger("/tmp/tb_data")
+    # tb_logger = TensorboardLogger("/tmp/tb_data")
 
     # keep track of the loss
     ewc_penalty_metric = GenericFloatMetric(
@@ -57,7 +57,7 @@ if __name__ == "__main__":
 
     evaluator = RLEvaluationPlugin(
         *default_dqn_logger.metrics, ewc_penalty_metric,
-        loggers=default_dqn_logger.loggers + [tb_logger])
+        loggers=default_dqn_logger.loggers)
 
     # here we'll have task-specific biases & gains per layer (2 since we're learning 2 games)
     model = EWCConvDeepQN(4, (84, 84), action_space, n_tasks=2, bias=True)
@@ -80,10 +80,9 @@ if __name__ == "__main__":
     # are shorter (3e4 steps)
     strategy = DQNStrategy(
         model, optimizer,
-        per_experience_steps=[Timestep(int(1e5)),
-                              Timestep(int(1e5))] +
-        [Timestep(int(3e4)),
-         Timestep(int(3e4))] * 2, batch_size=32, exploration_fraction=.15,
+        # per_experience_steps=[Timestep(int(1e5)), Timestep(int(1e5))] + [Timestep(int(3e4)), Timestep(int(3e4))] * 2,
+        per_experience_steps=[Timestep(int(1e2)), Timestep(int(1e2))],
+        batch_size=32, exploration_fraction=.15,
         final_epsilon=.01, max_steps_per_rollout=4,
         plugins=[ewc_plugin, HalveEps()],
         # external replay memory is automatically filled with initial size and reset on new experience
@@ -98,7 +97,7 @@ if __name__ == "__main__":
         print("Start of experience ", experience.current_experience)
         print("Current Env ", experience.env)
 
-        strategy.train(experience, [scenario.test_stream])
+        strategy.train(experience, [scenario.eval_stream])
         # print('Training completed')
         # save model and optimizer
         torch.save(
