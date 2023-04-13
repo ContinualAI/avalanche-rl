@@ -6,3 +6,4 @@ atari-py==0.2.9
 pygame
 torch 
 torchvision
+numpy==1.23.5

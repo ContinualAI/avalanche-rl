@@ -56,13 +56,11 @@ jobs:
       - uses: actions/checkout@v2
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-      - name: install coverage.py and coverralls
+      - name: install pytest
         run: |
-          whoami
-          echo $(pwd)
           source /app/venv/bin/activate
           pip install pytest
-      - name: python unit test
+      - name: run tests
         id: unittest
         run: |
           source /app/venv/bin/activate
